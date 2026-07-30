@@ -10,6 +10,9 @@ class Hand:
 
     def remove_card(self, card: Card):
         self.cards.remove(card)
+
+    def clear(self):
+        self.cards = []
     
     def __len__(self):
         return len(self.cards)

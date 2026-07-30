@@ -15,6 +15,13 @@ class Deck:
     def draw(self):
         dealt_card = self.cards.pop()
         return dealt_card
+    
+    def reset(self):
+        self.cards = []
+        for suit in VALID_SUITS:
+            for rank in VALID_RANKS:
+                self.cards.append(Card(rank, suit))
+        self.shuffle()
 
     def __len__(self):
         return len(self.cards)
@@ -39,7 +46,9 @@ class Deck:
         return output
 
 deck = Deck()
-#deck.shuffle()
+deck.shuffle()
+print(deck)
+deck.reset()
 print(deck)
 #print(len(deck))
 #print(f"Card dealt: {deck.draw()}")
