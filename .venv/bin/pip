@@ -1,4 +1,4 @@
-#!/Users/colinmckay/poker-project/.venv/bin/python3
+#!/Users/colinmckay/poker-project/.venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
