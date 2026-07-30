@@ -19,4 +19,3 @@ class Card:
         
     def __str__(self) -> str:
         return f"{self.rank} of {self.suit}"
-    
