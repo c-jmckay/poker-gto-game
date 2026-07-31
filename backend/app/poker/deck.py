@@ -44,12 +44,3 @@ class Deck:
         for card in self.cards:
             output += f"{card}\n"
         return output
-
-deck = Deck()
-deck.shuffle()
-print(deck)
-deck.reset()
-print(deck)
-#print(len(deck))
-#print(f"Card dealt: {deck.draw()}")
-#print(len(deck))

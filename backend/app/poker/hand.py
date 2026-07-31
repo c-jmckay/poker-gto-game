@@ -1,5 +1,5 @@
 from .card import Card
-from .hand_rank import Hand_Rank
+from .hand_rank import HandRank
 
 class Hand:
     def __init__(self):
@@ -38,15 +38,15 @@ class Hand:
         return output
 
   
-hand = Hand()
-hand.add_card(Card("A", "Clubs"))
-hand.add_card(Card("K", "Clubs"))
-hand.add_card(Card("Q", "Clubs"))
-print(len(hand))
-print(hand)
-five = Card("5", "Clubs")
-ace = Card("A", "Clubs")
-ace_2 = Card("A", "Diamonds")
-print(five in hand)
-print(ace in hand)
-print(ace_2 in hand)
+#hand = Hand()
+#hand.add_card(Card("A", "Clubs"))
+#hand.add_card(Card("K", "Clubs"))
+#hand.add_card(Card("Q", "Clubs"))
+#print(len(hand))
+#print(hand)
+#five = Card("5", "Clubs")
+#ace = Card("A", "Clubs")
+#ace_2 = Card("A", "Diamonds")
+#print(five in hand)
+#print(ace in hand)
+#print(ace_2 in hand)

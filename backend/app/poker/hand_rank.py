@@ -1,6 +1,6 @@
 from enum import IntEnum
 
-class Hand_Rank(IntEnum):
+class HandRank(IntEnum):
     HIGH_CARD = 1
     PAIR = 2
     TWO_PAIR = 3

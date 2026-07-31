@@ -38,6 +38,7 @@ class Card:
             "A": 13
         }[self.rank]
 
-card = Card("9", "Diamonds")
-print(card)
-print(card.value)
+if __name__ == "__main__":
+    card = Card("9", "Diamonds")
+    print(card)
+    print(card.value)
