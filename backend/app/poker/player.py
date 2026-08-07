@@ -10,6 +10,7 @@ class Player:
         self.chips = chips
         self.folded = False
         self.current_bet = 0
+        self.full_hand_rank = (0,)
 
     def fold(self):
         self.folded = True
