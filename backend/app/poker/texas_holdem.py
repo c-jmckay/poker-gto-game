@@ -125,6 +125,7 @@ class TexasHoldem:
         return
     
     def showdown(self):
+        print()
         best_hand_rank = (0,)
         #winner_index = (self.dealer_index+3)%self.num_players
         winners = []
@@ -139,7 +140,7 @@ class TexasHoldem:
                     full_hand.add_card(card)
                 hand_rank = HandEvaluator.evaluate_seven(full_hand)
                 self.players[p].full_hand_rank = hand_rank
-                print(f"\n{self.players[p].name} reveals {self.players[p].hand} giving {hand_rank}")
+                print(f"{self.players[p].name} reveals {self.players[p].hand} giving {hand_rank}")
                 if (hand_rank>best_hand_rank):
                     best_hand_rank = hand_rank
                     #winner_index = p
@@ -154,9 +155,9 @@ class TexasHoldem:
         else:
             names = ""
             for player in winners:
-                self.player_wins(player, self.pot/len(winners))
+                self.player_wins(player, self.pot//len(winners))
                 names+=f"{player.name}, "
-            print(f"{names} chop the pot for {self.pot/len(winners)} each")
+            print(f"{names} chop the pot for {self.pot//len(winners)} each")
 
     def uncontested_win(self):
         for i in range(self.num_players):
