@@ -8,9 +8,15 @@ class Player:
         self.hand = Hand()
         self.name = name
         self.chips = chips
+
         self.folded = False
+        self.all_in = False
+
         self.current_bet = 0
+        self.total_contribution = 0
+
         self.full_hand_rank = (0,)
+        
 
     def fold(self):
         self.folded = True
@@ -21,7 +27,9 @@ class Player:
 
     def reset_hand(self):
         self.folded = False
+        self.all_in = False
         self.current_bet = 0
+        self.total_contribution = 0
         self.hand.clear()
     
     def show_stack(self):
@@ -32,7 +40,10 @@ class Player:
 
     def bet(self, size: int):
         self.current_bet += size
+        self.total_contribution += size
         self.chips-=size
+        if self.chips <= 0:
+            self.all_in = True
 
     def receive_winnings(self, size: int):
         self.chips+=size
