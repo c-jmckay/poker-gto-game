@@ -7,6 +7,7 @@ class ActionType(Enum):
     CALL = "call"
     BET = "bet"
     RAISE = "raise"
+    ALL_IN = "all in"
 
 @dataclass(frozen=True)
 class PlayerAction:

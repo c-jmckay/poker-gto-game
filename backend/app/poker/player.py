@@ -16,6 +16,7 @@ class Player:
         self.total_contribution = 0
 
         self.full_hand_rank = (0,)
+        self.recent_winnings = 0
         
 
     def fold(self):
@@ -30,6 +31,7 @@ class Player:
         self.all_in = False
         self.current_bet = 0
         self.total_contribution = 0
+        self.recent_winnings = 0
         self.hand.clear()
     
     def show_stack(self):
@@ -44,7 +46,14 @@ class Player:
         self.chips-=size
         if self.chips <= 0:
             self.all_in = True
-
+    
     def receive_winnings(self, size: int):
         self.chips+=size
+        self.recent_winnings+=size
+
+    def __str__(self) -> str:
+        return f"{self.name}"
+    
+    def __repr__(self) -> str:
+        return f"{self.name}"
     

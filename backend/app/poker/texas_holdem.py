@@ -6,6 +6,7 @@ from .player import Player
 from .action import ActionType, PlayerAction
 from collections.abc import Callable
 from .prompt_terminal import prompt_for_action
+from .pot import Pot
 
 
 class TexasHoldem:
@@ -18,7 +19,7 @@ class TexasHoldem:
         self.community_cards = Hand()
 
         #betting
-        self.pot = 0
+        self.total_pot = 0
         self.small_blind = 10
         self.big_blind = 20
         self.current_bet = 0
@@ -27,6 +28,7 @@ class TexasHoldem:
         self.dealer_index = 0
         self.num_players = len(players)
         self.num_players_remaining = self.num_players
+        self.num_players_unfolded = self.num_players
         self.hands_played = 0
         self.max_hands_played = 3
         self.last_to_act = self.dealer_index
@@ -41,20 +43,21 @@ class TexasHoldem:
         self.enter_blinds()
         self.deal_hole_cards()
         self.betting_round(True)
-        if (self.num_players_remaining>1):
+        if (self.num_players_unfolded>1):
             self.deal_flop()
             self.betting_round(False)
-        if (self.num_players_remaining>1):
+        if (self.num_players_unfolded>1):
             self.deal_turn()
             self.betting_round(False)
-        if (self.num_players_remaining>1):
+        if (self.num_players_unfolded>1):
             self.deal_river()
             self.betting_round(False)
         
-        if (self.num_players_remaining<=1):
+        if (self.num_players_unfolded==1):
             self.uncontested_win()
         else:
             self.showdown()
+        self.show_winnings()
         return
     
     def enter_blinds(self):
@@ -72,7 +75,7 @@ class TexasHoldem:
 
         p = first_position
         while (True):
-            if players[p].folded == False:
+            if players[p].folded == False and players[p].all_in == False:
                 self.apply_action(players[p], prompt_for_action(self, players[p]))
             if p == self.last_to_act:
                 self.reset_round_bets()
@@ -82,10 +85,22 @@ class TexasHoldem:
     
     def player_bet(self, player: Player, size: int):
         player.bet(size)
-        self.pot+=size
+        self.total_pot+=size
         if player.current_bet > self.current_bet:
             self.last_to_act = (self.players.index(player)-1)%self.num_players
             self.current_bet = player.current_bet
+
+    def player_fold(self, player: Player):
+        player.fold()
+        self.num_players_unfolded-=1
+        self.num_players_remaining-=1
+        return
+    
+    def player_all_in(self, player: Player):
+        self.player_bet(player, player.chips)
+        print(f"{player.name} goes ALL IN for {player.current_bet}")
+        self.num_players_remaining-=1
+        return
 
     def reset_round_bets(self):
         self.current_bet = 0
@@ -107,80 +122,143 @@ class TexasHoldem:
         self.community_cards.add_card(self.deck.draw())
         self.community_cards.add_card(self.deck.draw())
         print(f"\nFlop: {self.community_cards}")
-        print(f"The pot contains {self.pot} chips")
+        self.show_pot()
         return
     
     def deal_turn(self):
         self.deck.draw()
         self.community_cards.add_card(self.deck.draw())
         print(f"\nTurn: {self.community_cards}")
-        print(f"The pot contains {self.pot} chips")
+        self.show_pot()
         return
 
     def deal_river(self):
         self.deck.draw()
         self.community_cards.add_card(self.deck.draw())
         print(f"\nRiver: {self.community_cards}")
-        print(f"The pot contains {self.pot} chips")
+        self.show_pot()
         return
     
+    #def showdown(self):
+    #    print()
+    #    self.construct_side_pots()
+    #    best_hand_rank = (0,)
+    #    #winner_index = (self.dealer_index+3)%self.num_players
+    #    winners = []
+    #    i = 0
+    #    while (i < self.num_players):
+    #        p = (self.dealer_index+3+i)%self.num_players
+    #        if (self.players[p].folded == False):
+    #            full_hand = Hand()
+    #            for card in self.community_cards:
+    #                full_hand.add_card(card)
+    #            for card in self.players[p].hand:
+    #                full_hand.add_card(card)
+    #            hand_rank = HandEvaluator.evaluate_seven(full_hand)
+    #            self.players[p].full_hand_rank = hand_rank
+    #            print(f"{self.players[p].name} reveals {self.players[p].hand} giving {hand_rank}")
+    #            if (hand_rank>best_hand_rank):
+    #                best_hand_rank = hand_rank
+    #                #winner_index = p
+    #                winners = [self.players[p]]
+    #            elif (hand_rank == best_hand_rank):
+    #                winners.append(self.players[p])
+    #        i+=1
+    #    #checking for chop pot
+    #    if (len(winners)==1):
+    #        self.player_wins(winners[0], self.total_pot)
+    #        print(f"\n{winners[0].name} wins the hand with {best_hand_rank}.")
+    #    else:
+    #        names = ""
+    #        for player in winners:
+    #            self.player_wins(player, self.total_pot//len(winners))
+    #            names+=f"{player.name}, "
+    #        print(f"{names} chop the pot for {self.total_pot//len(winners)} each")
+
     def showdown(self):
-        print()
+        print("Showdown:")
+        self.evaluate_player_hands()
+        for player in self.players:
+            print(f"{player.name} reveals {player.hand}, making {player.full_hand_rank}")
+        pots: list[Pot] = self.construct_side_pots()
+        for pot in pots:
+            self.award_pot(pot)
+
+    def evaluate_player_hands(self):
+        for player in self.players:
+            full_hand = Hand() 
+            for card in self.community_cards:
+                full_hand.add_card(card)
+            for card in player.hand:
+                full_hand.add_card(card)
+            player.full_hand_rank = HandEvaluator.evaluate_seven(full_hand)
+
+    def award_pot(self, pot: Pot):
         best_hand_rank = (0,)
-        #winner_index = (self.dealer_index+3)%self.num_players
         winners = []
-        i = 0
-        while (i < self.num_players):
-            p = (self.dealer_index+3+i)%self.num_players
-            if (self.players[p].folded == False):
-                full_hand = Hand()
-                for card in self.community_cards:
-                    full_hand.add_card(card)
-                for card in self.players[p].hand:
-                    full_hand.add_card(card)
-                hand_rank = HandEvaluator.evaluate_seven(full_hand)
-                self.players[p].full_hand_rank = hand_rank
-                print(f"{self.players[p].name} reveals {self.players[p].hand} giving {hand_rank}")
-                if (hand_rank>best_hand_rank):
-                    best_hand_rank = hand_rank
-                    #winner_index = p
-                    winners = [self.players[p]]
-                elif (hand_rank == best_hand_rank):
-                    winners.append(self.players[p])
-            i+=1
-        #checking for chop pot
-        if (len(winners)==1):
-            self.player_wins(winners[0], self.pot)
-            print(f"\n{winners[0].name} wins the hand with {best_hand_rank}.")
+        for player in pot.eligible_players:
+            if player.full_hand_rank > best_hand_rank:
+                best_hand_rank = player.full_hand_rank
+                winners = [player]
+            elif player.full_hand_rank == best_hand_rank:
+                winners.append(player)
+        if len(winners) == 1:
+            winners[0].receive_winnings(pot.amount)
+            #print(f"\n{winners[0].name} wins {pot.amount} with {best_hand_rank}.")
         else:
             names = ""
             for player in winners:
-                self.player_wins(player, self.pot//len(winners))
+                player.receive_winnings(pot.amount//len(winners))
                 names+=f"{player.name}, "
-            print(f"{names} chop the pot for {self.pot//len(winners)} each")
+            #print(f"{names} win {pot.amount//len(winners)} each with {best_hand_rank}.")
 
+    def construct_side_pots(self):
+        levels = sorted(set(player.total_contribution for player in self.players))
+        pots: list[Pot] = []
+        i = 0
+        last_level = 0
+        while (i < len(levels)):
+            if (levels[i]>0):
+                new_pot_size = 0
+                eligibles: list[Player] = []
+                for player in self.players:
+                    if player.total_contribution >= levels[i]:
+                        if player.folded == False:
+                            eligibles.append(player)
+                        #levels[i]-last_level is the level width
+                        new_pot_size += levels[i]-last_level
+                pots.append(Pot(new_pot_size, eligibles))
+                last_level = levels[i]
+            i+=1
+        print(levels)
+        print(pots)
+        return pots
+        
     def uncontested_win(self):
         for i in range(self.num_players):
             if self.players[i].folded == False:
-                self.player_wins(self.players[i])
+                self.players[i].receive_winnings(self.total_pot)
                 print(f"\n{self.players[i].name} wins the hand before showdown.")
-        
-    def player_wins(self, player: Player, amount: int):
-        player.receive_winnings(amount)
 
     def finish_hand(self):
         for player in self.players:
             player.reset_hand()
         self.dealer_index = (self.dealer_index+1)%self.num_players
         self.current_bet = 0
-        self.pot = 0
+        self.total_pot = 0
         self.num_players_remaining = self.num_players
+        self.num_players_unfolded = self.num_players
         self.deck.reset()
         self.community_cards.clear()
         self.hands_played+=1
         self.show_player_stacks()
         print("\n")
     
+    def show_winnings(self):
+        for player in self.players:
+            if player.recent_winnings > 0:
+                print(f"{player.name} wins {player.recent_winnings}.")
+        
     def show_hole_cards(self):
         for player in self.players:
             player.show_hole_cards()
@@ -189,6 +267,9 @@ class TexasHoldem:
         print()
         for player in self.players:
             player.show_stack()
+    
+    def show_pot(self):
+        print(f"The pot contains {self.total_pot} chips.")
 
     def apply_action(self, player: Player, action: PlayerAction):
         legal_actions = self.get_legal_actions(player)
@@ -197,8 +278,7 @@ class TexasHoldem:
             raise ValueError("Illegal action")
             
         if action.action_type == ActionType.FOLD:
-            player.fold()
-            self.num_players_remaining-=1
+            self.player_fold(player)
             return
 
         elif action.action_type == ActionType.CHECK:
@@ -206,42 +286,51 @@ class TexasHoldem:
 
         elif action.action_type == ActionType.CALL:
             amount_to_call = self.current_bet - player.current_bet
-            if amount_to_call > player.chips:
-                raise ValueError("Player cannot afford to call")
-            self.player_bet(player, amount_to_call)
+            if amount_to_call >= player.chips:
+                self.player_all_in(player)
+            else:
+                self.player_bet(player, amount_to_call)
             return
 
         elif action.action_type == ActionType.BET:
             if action.amount <= 0:
                 raise ValueError("Bet must be positive")
-
             if action.amount > player.chips:
                 raise ValueError("Player cannot afford that bet")
-            self.player_bet(player, action.amount)
+            
+            if action.amount == player.chips:
+                self.player_all_in(player)
+            else:
+                self.player_bet(player, action.amount)
             return
 
         elif action.action_type == ActionType.RAISE:
             if action.amount <= self.current_bet:
                 raise ValueError("Raise must exceed the current bet")
-
             amount_to_add = action.amount - player.current_bet
-
             if amount_to_add > player.chips:
                 raise ValueError("Player cannot afford that raise")
             
-            self.player_bet(player, amount_to_add)
+            if amount_to_add == player.chips:
+                self.player_all_in(player)
+            else:
+                self.player_bet(player, amount_to_add)
             return
+
+        elif action.action_type == ActionType.ALL_IN:
+            self.player_all_in(player)
+
     
     def get_legal_actions(self, player: Player) -> list[ActionType]:
         amount_to_call = self.current_bet - player.current_bet
 
         if amount_to_call == 0:
-            return [ActionType.CHECK, ActionType.BET,]
+            return [ActionType.CHECK, ActionType.BET, ActionType.ALL_IN]
 
-        return [ActionType.FOLD, ActionType.CALL, ActionType.RAISE,]
+        return [ActionType.FOLD, ActionType.CALL, ActionType.RAISE, ActionType.ALL_IN]
 
 
 if __name__ == "__main__":
-    players = [Player("Colin", 2000), Player("Brooke", 2000), Player("Ella", 2000), Player("Ray", 2000), Player("Ty", 2000)]
+    players = [Player("Colin", 2000), Player("Brooke", 2000), Player("Ella", 3000), Player("Ray", 2000), Player("Ty", 1000)]
     game = TexasHoldem(players)
     game.start_game()
