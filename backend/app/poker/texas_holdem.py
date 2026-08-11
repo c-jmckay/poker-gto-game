@@ -138,48 +138,13 @@ class TexasHoldem:
         print(f"\nRiver: {self.community_cards}")
         self.show_pot()
         return
-    
-    #def showdown(self):
-    #    print()
-    #    self.construct_side_pots()
-    #    best_hand_rank = (0,)
-    #    #winner_index = (self.dealer_index+3)%self.num_players
-    #    winners = []
-    #    i = 0
-    #    while (i < self.num_players):
-    #        p = (self.dealer_index+3+i)%self.num_players
-    #        if (self.players[p].folded == False):
-    #            full_hand = Hand()
-    #            for card in self.community_cards:
-    #                full_hand.add_card(card)
-    #            for card in self.players[p].hand:
-    #                full_hand.add_card(card)
-    #            hand_rank = HandEvaluator.evaluate_seven(full_hand)
-    #            self.players[p].full_hand_rank = hand_rank
-    #            print(f"{self.players[p].name} reveals {self.players[p].hand} giving {hand_rank}")
-    #            if (hand_rank>best_hand_rank):
-    #                best_hand_rank = hand_rank
-    #                #winner_index = p
-    #                winners = [self.players[p]]
-    #            elif (hand_rank == best_hand_rank):
-    #                winners.append(self.players[p])
-    #        i+=1
-    #    #checking for chop pot
-    #    if (len(winners)==1):
-    #        self.player_wins(winners[0], self.total_pot)
-    #        print(f"\n{winners[0].name} wins the hand with {best_hand_rank}.")
-    #    else:
-    #        names = ""
-    #        for player in winners:
-    #            self.player_wins(player, self.total_pot//len(winners))
-    #            names+=f"{player.name}, "
-    #        print(f"{names} chop the pot for {self.total_pot//len(winners)} each")
 
     def showdown(self):
         print("Showdown:")
         self.evaluate_player_hands()
         for player in self.players:
-            print(f"{player.name} reveals {player.hand}, making {player.full_hand_rank}")
+            if player.folded == False:
+                print(f"{player.name} reveals {player.hand}, making {player.full_hand_rank}")
         pots: list[Pot] = self.construct_side_pots()
         for pot in pots:
             self.award_pot(pot)
@@ -206,10 +171,10 @@ class TexasHoldem:
             winners[0].receive_winnings(pot.amount)
             #print(f"\n{winners[0].name} wins {pot.amount} with {best_hand_rank}.")
         else:
-            names = ""
+            #names = ""
             for player in winners:
                 player.receive_winnings(pot.amount//len(winners))
-                names+=f"{player.name}, "
+                #names+=f"{player.name}, "
             #print(f"{names} win {pot.amount//len(winners)} each with {best_hand_rank}.")
 
     def construct_side_pots(self):
@@ -230,8 +195,8 @@ class TexasHoldem:
                 pots.append(Pot(new_pot_size, eligibles))
                 last_level = levels[i]
             i+=1
-        print(levels)
-        print(pots)
+        #print(levels)
+        #print(pots)
         return pots
         
     def uncontested_win(self):
@@ -331,6 +296,6 @@ class TexasHoldem:
 
 
 if __name__ == "__main__":
-    players = [Player("Colin", 2000), Player("Brooke", 2000), Player("Ella", 3000), Player("Ray", 2000), Player("Ty", 1000)]
+    players = [Player("Colin", 500), Player("Brooke", 5000), Player("Ella", 3000), Player("Ray", 2000), Player("Ty", 1000)]
     game = TexasHoldem(players)
     game.start_game()
