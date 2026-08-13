@@ -143,6 +143,7 @@ class HandEvaluator:
                 #    five.add_card(card)
                 #print(five)
         return cur
+    
 
 #if __name__ == "__main__":
     #tup1 = (HandRank.STRAIGHT, 11, 8, 6, 5, 1)

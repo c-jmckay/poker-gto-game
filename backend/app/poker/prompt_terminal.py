@@ -34,9 +34,9 @@ def prompt_for_action(game, player: Player) -> PlayerAction:
             except ValueError:
                 print("Please enter a whole number.")
                 continue
-
+            print()    
             return PlayerAction(action_type, amount)
-
+        print()
         return PlayerAction(action_type)
 
 

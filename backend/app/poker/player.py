@@ -2,9 +2,12 @@ from .hand_rank import HandRank
 from .hand import Hand
 from .card import Card
 from .deck import Deck
+#from .bots.controller import Controller
 
 class Player:
-    def __init__(self, name: str, chips: int):
+    def __init__(self, name: str, chips: int, controller):
+        self.controller = controller
+
         self.hand = Hand()
         self.name = name
         self.chips = chips

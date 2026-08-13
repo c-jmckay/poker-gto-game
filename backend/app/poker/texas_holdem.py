@@ -3,10 +3,12 @@ from .card import Card
 from .hand import Hand
 from .hand_evaluator import HandEvaluator
 from .player import Player
-from .action import ActionType, PlayerAction
+from .action import ActionType, PlayerAction, LegalActions
 from collections.abc import Callable
 from .prompt_terminal import prompt_for_action
 from .pot import Pot
+from .bots.user_controller import UserController
+from .bots.random_bot import RandomBot
 
 
 class TexasHoldem:
@@ -34,9 +36,10 @@ class TexasHoldem:
         self.last_to_act = self.dealer_index
         
     def start_game(self):
-        while (self.hands_played < self.max_hands_played):
+        while (self.num_players>1):
             self.start_hand()
             self.finish_hand()
+        self.announce_action(f"{players[0]} wins!")
         return
     
     def start_hand(self):
@@ -76,8 +79,10 @@ class TexasHoldem:
         p = first_position
         while (True):
             if players[p].folded == False and players[p].all_in == False:
-                self.apply_action(players[p], prompt_for_action(self, players[p]))
-            if p == self.last_to_act:
+                action = players[p].controller.choose_action(self, players[p])
+                self.apply_action(players[p], action)
+
+            if p == self.last_to_act or self.num_players_unfolded == 1:
                 self.reset_round_bets()
                 return
             p = (p+1)%self.num_players
@@ -98,7 +103,6 @@ class TexasHoldem:
     
     def player_all_in(self, player: Player):
         self.player_bet(player, player.chips)
-        print(f"{player.name} goes ALL IN for {player.current_bet}")
         self.num_players_remaining-=1
         return
 
@@ -140,11 +144,12 @@ class TexasHoldem:
         return
 
     def showdown(self):
-        print("Showdown:")
+        print("\nShowdown:")
         self.evaluate_player_hands()
         for player in self.players:
             if player.folded == False:
                 print(f"{player.name} reveals {player.hand}, making {player.full_hand_rank}")
+        print()
         pots: list[Pot] = self.construct_side_pots()
         for pot in pots:
             self.award_pot(pot)
@@ -208,7 +213,11 @@ class TexasHoldem:
     def finish_hand(self):
         for player in self.players:
             player.reset_hand()
+        #button moves to next player with chips
         self.dealer_index = (self.dealer_index+1)%self.num_players
+        while (players[self.dealer_index].chips<=0):
+            self.dealer_index = (self.dealer_index+1)%self.num_players
+        self.remove_losers()
         self.current_bet = 0
         self.total_pot = 0
         self.num_players_remaining = self.num_players
@@ -218,6 +227,13 @@ class TexasHoldem:
         self.hands_played+=1
         self.show_player_stacks()
         print("\n")
+
+    def remove_losers(self):
+        for player in self.players:
+            if player.chips <= 0:
+                self.announce_action(f"{player} leaves the table.")
+                players.remove(player)
+                self.num_players -=1
     
     def show_winnings(self):
         for player in self.players:
@@ -236,25 +252,32 @@ class TexasHoldem:
     def show_pot(self):
         print(f"The pot contains {self.total_pot} chips.")
 
+    def announce_action(self, message: str):
+        print(message)
+        
     def apply_action(self, player: Player, action: PlayerAction):
         legal_actions = self.get_legal_actions(player)
 
-        if action.action_type not in legal_actions:
+        if action.action_type not in legal_actions.actions:
             raise ValueError("Illegal action")
             
         if action.action_type == ActionType.FOLD:
             self.player_fold(player)
+            self.announce_action(f"{player} folds.")
             return
 
         elif action.action_type == ActionType.CHECK:
+            self.announce_action(f"{player} checks.")
             return
 
         elif action.action_type == ActionType.CALL:
             amount_to_call = self.current_bet - player.current_bet
             if amount_to_call >= player.chips:
                 self.player_all_in(player)
+                self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
             else:
                 self.player_bet(player, amount_to_call)
+                self.announce_action(f"{player} calls.")
             return
 
         elif action.action_type == ActionType.BET:
@@ -265,8 +288,10 @@ class TexasHoldem:
             
             if action.amount == player.chips:
                 self.player_all_in(player)
+                self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
             else:
                 self.player_bet(player, action.amount)
+                self.announce_action(f"{player} bets {player.current_bet} chips.")
             return
 
         elif action.action_type == ActionType.RAISE:
@@ -278,24 +303,35 @@ class TexasHoldem:
             
             if amount_to_add == player.chips:
                 self.player_all_in(player)
+                self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
             else:
                 self.player_bet(player, amount_to_add)
+                self.announce_action(f"{player} raises to {player.current_bet} chips.")
             return
 
         elif action.action_type == ActionType.ALL_IN:
             self.player_all_in(player)
+            self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
 
     
-    def get_legal_actions(self, player: Player) -> list[ActionType]:
+    def get_legal_actions(self, player: Player) -> LegalActions:
         amount_to_call = self.current_bet - player.current_bet
+        leg = LegalActions()
 
         if amount_to_call == 0:
-            return [ActionType.CHECK, ActionType.BET, ActionType.ALL_IN]
+            leg.actions = [ActionType.CHECK, ActionType.BET, ActionType.ALL_IN]
+        else:
+            leg.actions = [ActionType.FOLD, ActionType.CALL, ActionType.RAISE, ActionType.ALL_IN]
 
-        return [ActionType.FOLD, ActionType.CALL, ActionType.RAISE, ActionType.ALL_IN]
+        return leg
 
 
 if __name__ == "__main__":
-    players = [Player("Colin", 500), Player("Brooke", 5000), Player("Ella", 3000), Player("Ray", 2000), Player("Ty", 1000)]
+    #players = [Player("Colin", 500, UserController()), 
+    #           Player("Brooke", 5000, UserController()), 
+    #           Player("Ella", 3000, UserController()), 
+    #           Player("Ray", 2000, UserController()), 
+    #           Player("Ty", 1000, UserController())]
+    players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, RandomBot())]
     game = TexasHoldem(players)
     game.start_game()

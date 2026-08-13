@@ -1,0 +1,11 @@
+running a test code -> python -m backend.app.poker.deck
+
+using a main block to test code
+
+    if __name__ == "__main__":
+        hand = Hand()
+
+        hand.add_card(Card("A", "Spades"))
+        hand.add_card(Card("K", "Hearts"))
+
+        print(hand)
