@@ -25,6 +25,7 @@ class TexasHoldem:
         self.small_blind = 10
         self.big_blind = 20
         self.current_bet = 0
+        self.min_raise_incr = self.big_blind
 
         #order of play
         self.dealer_index = 0
@@ -289,9 +290,13 @@ class TexasHoldem:
             if action.amount == player.chips:
                 self.player_all_in(player)
                 self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
-            else:
+                return
+            if action.amount >= legal_actions.min_bet:
+                self.min_raise_incr = action.amount - self.current_bet
                 self.player_bet(player, action.amount)
                 self.announce_action(f"{player} bets {player.current_bet} chips.")
+            else: 
+                raise ValueError("Bet does not exceed minimum raise")
             return
 
         elif action.action_type == ActionType.RAISE:
@@ -300,30 +305,35 @@ class TexasHoldem:
             amount_to_add = action.amount - player.current_bet
             if amount_to_add > player.chips:
                 raise ValueError("Player cannot afford that raise")
-            
             if amount_to_add == player.chips:
+                self.min_raise_incr = action.amount - self.current_bet
                 self.player_all_in(player)
                 self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
-            else:
+                return
+            if action.amount >= legal_actions.min_raise:
+                self.min_raise_incr = action.amount - self.current_bet
                 self.player_bet(player, amount_to_add)
                 self.announce_action(f"{player} raises to {player.current_bet} chips.")
+            else:
+                raise ValueError("Bet does not exceed minimum raise")
             return
 
         elif action.action_type == ActionType.ALL_IN:
+            self.min_raise_incr = action.amount - self.current_bet
             self.player_all_in(player)
             self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
 
     
     def get_legal_actions(self, player: Player) -> LegalActions:
         amount_to_call = self.current_bet - player.current_bet
-        leg = LegalActions()
 
         if amount_to_call == 0:
-            leg.actions = [ActionType.CHECK, ActionType.BET, ActionType.ALL_IN]
+            return LegalActions([ActionType.CHECK, ActionType.BET, ActionType.ALL_IN], 
+                                0, self.min_raise_incr+self.min_raise_incr, None, player.chips + player.current_bet)
         else:
-            leg.actions = [ActionType.FOLD, ActionType.CALL, ActionType.RAISE, ActionType.ALL_IN]
+            return LegalActions([ActionType.FOLD, ActionType.CALL, ActionType.RAISE, ActionType.ALL_IN], 
+                                amount_to_call, None, self.current_bet+self.min_raise_incr, player.chips + player.current_bet)
 
-        return leg
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ def prompt_for_action(game, player: Player) -> PlayerAction:
         print(f"Your current bet: {player.current_bet}")
         print(
             "Legal actions:",
-            ", ".join(action.value for action in legal_actions),
+            ", ".join(action.value for action in legal_actions.actions),
         )
 
         choice = input("Choose an action: ").strip().lower()
@@ -24,7 +24,7 @@ def prompt_for_action(game, player: Player) -> PlayerAction:
             print("That is not a valid action.")
             continue
 
-        if action_type not in legal_actions:
+        if action_type not in legal_actions.actions:
             print("Illegal action.")
             continue
 
