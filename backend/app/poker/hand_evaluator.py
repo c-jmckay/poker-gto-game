@@ -144,8 +144,12 @@ class HandEvaluator:
                 #print(five)
         return cur
     
-
 #if __name__ == "__main__":
+#    hand = Hand()
+#    hand.add_card(Card("K", "Diamonds"))
+#    hand.add_card(Card("3", "Clubs"))
+#    print(HandEvaluator.evaluate(hand))
+    #hand.add_card(Card("3", "Diamonds"))
     #tup1 = (HandRank.STRAIGHT, 11, 8, 6, 5, 1)
     #tup2 = (HandRank.FLUSH, 11, 8, 6, 5, 1)
     #print(f"{tup1}\n{tup2}")

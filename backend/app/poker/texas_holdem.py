@@ -9,6 +9,7 @@ from .prompt_terminal import prompt_for_action
 from .pot import Pot
 from .bots.user_controller import UserController
 from .bots.random_bot import RandomBot
+from .bots.basic_bot import BasicBot
 
 
 class TexasHoldem:
@@ -41,6 +42,7 @@ class TexasHoldem:
             self.start_hand()
             self.finish_hand()
         self.announce_action(f"{players[0]} wins!")
+        self.announce_action(f"{self.hands_played} hands played.")
         return
     
     def start_hand(self):
@@ -285,9 +287,9 @@ class TexasHoldem:
 
         elif action.action_type == ActionType.BET:
             if action.amount <= 0:
-                raise ValueError("Bet must be positive")
+                raise ValueError(f"Bet {action.amount} must be positive")
             if action.amount > player.chips:
-                raise ValueError("Player cannot afford that bet")
+                raise ValueError(f"Player cannot afford that bet {action.amount}")
             
             if action.amount == player.chips:
                 self.player_all_in(player)
@@ -298,15 +300,15 @@ class TexasHoldem:
                 self.player_bet(player, action.amount)
                 self.announce_action(f"{player} bets {player.current_bet} chips.")
             else: 
-                raise ValueError("Bet does not exceed minimum raise")
+                raise ValueError(f"Bet {action.amount} does not exceed minimum raise {legal_actions.min_bet}")
             return
 
         elif action.action_type == ActionType.RAISE:
             if action.amount <= self.current_bet:
-                raise ValueError("Raise must exceed the current bet")
+                raise ValueError(f"Raise {amount_to_add} must exceed the current bet {self.current_bet}")
             amount_to_add = action.amount - player.current_bet
             if amount_to_add > player.chips:
-                raise ValueError("Player cannot afford that raise")
+                raise ValueError(f"Player cannot afford that raise {amount_to_add}")
             if amount_to_add == player.chips:
                 self.min_raise_incr = action.amount - self.current_bet
                 self.player_all_in(player)
@@ -317,7 +319,7 @@ class TexasHoldem:
                 self.player_bet(player, amount_to_add)
                 self.announce_action(f"{player} raises to {player.current_bet} chips.")
             else:
-                raise ValueError("Bet does not exceed minimum raise")
+                raise ValueError(f"Bet {action.amount} does not exceed minimum raise {legal_actions.min_bet}")
             return
 
         elif action.action_type == ActionType.ALL_IN:
@@ -348,11 +350,12 @@ class TexasHoldem:
                                 amount_to_call, min_raise, max_bet)
 
 if __name__ == "__main__":
-    players = [Player("Colin", 500, RandomBot()), 
-               Player("Brooke", 5000, UserController()), 
-               Player("Ella", 3000, RandomBot()), 
-               Player("Ray", 2000, RandomBot()), 
-               Player("Ty", 1000, RandomBot())]
+    #players = [Player("Colin", 500, BasicBot()), 
+    #           Player("Brooke", 5000, UserController()), 
+    #           Player("Ella", 3000, BasicBot()), 
+    #           Player("Ray", 2000, BasicBot()), 
+    #           Player("Ty", 1000, BasicBot())]
+    players = [Player("Colin", 1000, BasicBot()), Player("Pat", 1000, BasicBot()), Player("Mikey", 1000, BasicBot()), Player("Noah", 1000, BasicBot())]
     #players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, RandomBot())]
     game = TexasHoldem(players)
     game.start_game()
