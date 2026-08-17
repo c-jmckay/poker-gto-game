@@ -23,6 +23,9 @@ class Deck:
                 self.cards.append(Card(rank, suit))
         self.shuffle()
 
+    def remove(self, card: Card):
+        self.cards.remove(card)
+
     def __len__(self):
         return len(self.cards)
     

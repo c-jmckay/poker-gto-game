@@ -356,7 +356,7 @@ def test_broadway_straight_is_ace_high() -> None:
 
     assert HandEvaluator.evaluate(broadway) > HandEvaluator.evaluate(king_high)
 
-def test_evaluate_seven_finds_straight_flush() -> None:
+def test_evaluate_perms_finds_straight_flush() -> None:
     seven_cards = make_hand(
         ("9", "Spades"),
         ("10", "Spades"),
@@ -367,12 +367,12 @@ def test_evaluate_seven_finds_straight_flush() -> None:
         ("A", "Diamonds"),
     )
 
-    result = HandEvaluator.evaluate_seven(seven_cards)
+    result = HandEvaluator.evaluate_perms(seven_cards)
 
     assert result[0] == HandRank.STRAIGHT_FLUSH
 
 
-def test_evaluate_seven_finds_full_house() -> None:
+def test_evaluate_perms_finds_full_house() -> None:
     seven_cards = make_hand(
         ("A", "Spades"),
         ("A", "Hearts"),
@@ -383,12 +383,12 @@ def test_evaluate_seven_finds_full_house() -> None:
         ("2", "Clubs"),
     )
 
-    result = HandEvaluator.evaluate_seven(seven_cards)
+    result = HandEvaluator.evaluate_perms(seven_cards)
 
     assert result[0] == HandRank.FULL_HOUSE
 
 
-def test_evaluate_seven_chooses_higher_full_house() -> None:
+def test_evaluate_perms_chooses_higher_full_house() -> None:
     seven_cards = make_hand(
         ("A", "Spades"),
         ("A", "Hearts"),
@@ -408,12 +408,12 @@ def test_evaluate_seven_chooses_higher_full_house() -> None:
     )
 
     assert (
-        HandEvaluator.evaluate_seven(seven_cards)
+        HandEvaluator.evaluate_perms(seven_cards)
         == HandEvaluator.evaluate(expected_best_five)
     )
 
 
-def test_evaluate_seven_finds_four_of_a_kind() -> None:
+def test_evaluate_perms_finds_four_of_a_kind() -> None:
     seven_cards = make_hand(
         ("8", "Spades"),
         ("8", "Hearts"),
@@ -424,12 +424,12 @@ def test_evaluate_seven_finds_four_of_a_kind() -> None:
         ("2", "Clubs"),
     )
 
-    result = HandEvaluator.evaluate_seven(seven_cards)
+    result = HandEvaluator.evaluate_perms(seven_cards)
 
     assert result[0] == HandRank.FOUR_OF_A_KIND
 
 
-def test_evaluate_seven_uses_best_kickers() -> None:
+def test_evaluate_perms_uses_best_kickers() -> None:
     seven_cards = make_hand(
         ("Q", "Spades"),
         ("Q", "Hearts"),
@@ -449,12 +449,12 @@ def test_evaluate_seven_uses_best_kickers() -> None:
     )
 
     assert (
-        HandEvaluator.evaluate_seven(seven_cards)
+        HandEvaluator.evaluate_perms(seven_cards)
         == HandEvaluator.evaluate(expected_best_five)
     )
 
 
-def test_evaluate_seven_chooses_flush_over_straight() -> None:
+def test_evaluate_perms_chooses_flush_over_straight() -> None:
     seven_cards = make_hand(
         ("A", "Hearts"),
         ("J", "Hearts"),
@@ -465,7 +465,7 @@ def test_evaluate_seven_chooses_flush_over_straight() -> None:
         ("9", "Diamonds"),
     )
 
-    result = HandEvaluator.evaluate_seven(seven_cards)
+    result = HandEvaluator.evaluate_perms(seven_cards)
 
     assert result[0] == HandRank.FLUSH
 

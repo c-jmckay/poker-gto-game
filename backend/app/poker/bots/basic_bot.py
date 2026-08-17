@@ -23,7 +23,7 @@ class BasicBot(Controller):
                 full_hand.add_card(card)
             for card in game.community_cards:
                 full_hand.add_card(card)
-            hand_strength = HandEvaluator.evaluate_seven(full_hand)[0]
+            hand_strength = HandEvaluator.evaluate_perms(full_hand)[0]
         
         if(legal_actions.min_bet>player.chips):
             if (ActionType.CALL in legal_actions.actions and legal_actions.amount_to_call <= player.chips):

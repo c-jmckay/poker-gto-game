@@ -9,3 +9,6 @@ using a main block to test code
         hand.add_card(Card("K", "Hearts"))
 
         print(hand)
+
+problems to fix:
+- hero can raise after villain goes all in in heads up

@@ -36,6 +36,8 @@ class TexasHoldem:
         self.hands_played = 0
         self.max_hands_played = 3
         self.last_to_act = self.dealer_index
+        self.is_heads_up = (self.num_players == 2)
+        print(f"is heads up: {self.is_heads_up}")
         
     def start_game(self):
         while (self.num_players>1):
@@ -70,17 +72,31 @@ class TexasHoldem:
         return
     
     def enter_blinds(self):
-        self.player_bet(self.players[(self.dealer_index+1)%self.num_players], self.small_blind)
-        self.announce_action(f"{self.players[(self.dealer_index+1)%self.num_players].name} enters small blind of {self.small_blind}.")
-        self.player_bet(self.players[(self.dealer_index+2)%self.num_players], self.big_blind)
-        self.announce_action(f"{self.players[(self.dealer_index+2)%self.num_players].name} enters big blind of {self.big_blind}.")
+        sb_index = (self.dealer_index+1)%self.num_players
+        sb_amount = min(self.small_blind, self.players[sb_index].chips)
+        bb_index = (self.dealer_index+2)%self.num_players
+        bb_amount = min(self.big_blind, self.players[bb_index].chips)
+        if (self.is_heads_up):
+            sb_index = self.dealer_index
+            bb_index = (self.dealer_index+1)%2
+        self.player_bet(self.players[sb_index], sb_amount)
+        self.announce_action(f"{self.players[sb_index].name} enters small blind of {sb_amount}.")
+        self.player_bet(self.players[bb_index], bb_amount)
+        self.announce_action(f"{self.players[bb_index].name} enters big blind of {bb_amount}.")
     
     def betting_round(self, is_preflop: bool):
+        print(f"{players[self.dealer_index].name} is the dealer")
         first_position = (self.dealer_index+1)%self.num_players
         self.last_to_act = self.dealer_index
+        if (self.is_heads_up):
+            first_position = (self.dealer_index+1)%2
+            self.last_to_act = self.dealer_index
         if is_preflop == True:
             first_position = (self.dealer_index+3)%self.num_players
             self.last_to_act = (self.dealer_index+2)%self.num_players
+            if (self.is_heads_up):
+                first_position = self.dealer_index
+                self.last_to_act = (self.dealer_index+1)%2
 
         p = first_position
         while (True):
@@ -100,15 +116,12 @@ class TexasHoldem:
         if player.current_bet > self.current_bet:
             self.last_to_act = (self.players.index(player)-1)%self.num_players
             self.current_bet = player.current_bet
+        if (player.chips == 0):
+            self.num_players_remaining-=1
 
     def player_fold(self, player: Player):
         player.fold()
         self.num_players_unfolded-=1
-        self.num_players_remaining-=1
-        return
-    
-    def player_all_in(self, player: Player):
-        self.player_bet(player, player.chips)
         self.num_players_remaining-=1
         return
 
@@ -165,7 +178,7 @@ class TexasHoldem:
                 full_hand.add_card(card)
             for card in player.hand:
                 full_hand.add_card(card)
-            player.full_hand_rank = HandEvaluator.evaluate_seven(full_hand)
+            player.full_hand_rank = HandEvaluator.evaluate_perms(full_hand)
 
     def award_pot(self, pot: Pot):
         best_hand_rank = (0,)
@@ -233,12 +246,16 @@ class TexasHoldem:
         print("\n")
 
     def remove_losers(self):
+        dealer = self.players[self.dealer_index]
         for player in self.players:
             if player.chips <= 0:
                 self.announce_action(f"{player} leaves the table.")
                 players.remove(player)
                 self.num_players -=1
+                self.dealer_index = self.players.index(dealer)
                 self.remove_losers()
+        self.is_heads_up = (self.num_players == 2)
+        self.dealer_index = self.players.index(dealer)
     
     def show_winnings(self):
         for player in self.players:
@@ -278,7 +295,7 @@ class TexasHoldem:
         elif action.action_type == ActionType.CALL:
             amount_to_call = self.current_bet - player.current_bet
             if amount_to_call >= player.chips:
-                self.player_all_in(player)
+                self.player_bet(player, player.chips)
                 self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
             else:
                 self.player_bet(player, amount_to_call)
@@ -292,7 +309,7 @@ class TexasHoldem:
                 raise ValueError(f"Player cannot afford that bet {action.amount}")
             
             if action.amount == player.chips:
-                self.player_all_in(player)
+                self.player_bet(player, player.chips)
                 self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
                 return
             if action.amount >= legal_actions.min_bet:
@@ -311,7 +328,7 @@ class TexasHoldem:
                 raise ValueError(f"Player cannot afford that raise {amount_to_add}")
             if amount_to_add == player.chips:
                 self.min_raise_incr = action.amount - self.current_bet
-                self.player_all_in(player)
+                self.player_bet(player, player.chips)
                 self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
                 return
             if action.amount >= legal_actions.min_bet:
@@ -324,7 +341,7 @@ class TexasHoldem:
 
         elif action.action_type == ActionType.ALL_IN:
             self.min_raise_incr = max(player.chips - self.current_bet, self.min_raise_incr)
-            self.player_all_in(player)
+            self.player_bet(player, player.chips)
             self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
     
     def get_legal_actions(self, player: Player) -> LegalActions:
@@ -350,12 +367,8 @@ class TexasHoldem:
                                 amount_to_call, min_raise, max_bet)
 
 if __name__ == "__main__":
-    #players = [Player("Colin", 500, BasicBot()), 
-    #           Player("Brooke", 5000, UserController()), 
-    #           Player("Ella", 3000, BasicBot()), 
-    #           Player("Ray", 2000, BasicBot()), 
-    #           Player("Ty", 1000, BasicBot())]
-    players = [Player("Colin", 1000, BasicBot()), Player("Pat", 1000, BasicBot()), Player("Mikey", 1000, BasicBot()), Player("Noah", 1000, BasicBot())]
-    #players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, RandomBot())]
+    #players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
+    #players = [Player("Colin", 10000, BasicBot()), Player("Pat", 1000, BasicBot()), Player("Mikey", 1000, BasicBot()), Player("Noah", 1000, BasicBot()), Player("Ethan", 1000, BasicBot()), Player("RV", 1000, BasicBot())]
+    players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, UserController()), Player("Jerry", 1000, UserController())]
     game = TexasHoldem(players)
     game.start_game()

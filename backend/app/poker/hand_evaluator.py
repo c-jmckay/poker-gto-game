@@ -132,7 +132,7 @@ class HandEvaluator:
         return False
             
     @staticmethod
-    def evaluate_seven(hand: Hand):
+    def evaluate_perms(hand: Hand):
         cur = (0,)
         for combo in combinations(hand,5):
             if HandEvaluator.evaluate(combo) > cur:
@@ -163,7 +163,7 @@ class HandEvaluator:
     #print(HandEvaluator.unsuited_values_sorted(hand))
     #hand.add_card(Card("J", "Diamonds"))
     #hand.add_card(Card("J", "Clubs"))
-    #HandEvaluator.evaluate_seven(hand)
+    #HandEvaluator.evaluate_perms(hand)
     #print(HandEvaluator.evaluate(hand))
     #print(-1%13)
     #print(0%13)
@@ -186,7 +186,7 @@ class HandEvaluator:
     #deck.shuffle()
     #for i in range(7):
     #    best_hand.add_card(deck.draw())
-    #best_hand_rank = HandEvaluator.evaluate_seven(best_hand)
+    #best_hand_rank = HandEvaluator.evaluate_perms(best_hand)
     #print(f"{best_hand} ---> {best_hand_rank}")
 #
     #while (j<1000):
@@ -194,7 +194,7 @@ class HandEvaluator:
     #    new_hand = Hand()
     #    for i in range(7):
     #        new_hand.add_card(deck.draw())
-    #    new_hand_rank = HandEvaluator.evaluate_seven(new_hand)
+    #    new_hand_rank = HandEvaluator.evaluate_perms(new_hand)
     #    if new_hand_rank > best_hand_rank:
     #        best_hand = new_hand
     #        best_hand_rank = new_hand_rank
@@ -209,7 +209,7 @@ class HandEvaluator:
 #        new_hand = Hand()
 #        for i in range(7):
 #            new_hand.add_card(deck.draw())
-#        new_hand_rank = HandEvaluator.evaluate_seven(new_hand)
+#        new_hand_rank = HandEvaluator.evaluate_perms(new_hand)
 #        if new_hand_rank == (HandRank.STRAIGHT_FLUSH, 13):
 #            print(f"{j}th iteration: {new_hand} ---> {new_hand_rank}")
 #            break
