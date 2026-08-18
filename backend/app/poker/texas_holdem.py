@@ -10,6 +10,7 @@ from .pot import Pot
 from .bots.user_controller import UserController
 from .bots.random_bot import RandomBot
 from .bots.basic_bot import BasicBot
+from .state import GameState, HeroState, VillainState
 
 
 class TexasHoldem:
@@ -37,7 +38,6 @@ class TexasHoldem:
         self.max_hands_played = 3
         self.last_to_act = self.dealer_index
         self.is_heads_up = (self.num_players == 2)
-        print(f"is heads up: {self.is_heads_up}")
         
     def start_game(self):
         while (self.num_players>1):
@@ -84,8 +84,16 @@ class TexasHoldem:
         self.player_bet(self.players[bb_index], bb_amount)
         self.announce_action(f"{self.players[bb_index].name} enters big blind of {bb_amount}.")
     
+    def create_game_state(self, hero: Player):
+        hero_state = HeroState(hero.name, hero.chips, hero.current_bet, hero.hand, hero.folded, hero.all_in)
+        villain_states = []
+        for player in self.players:
+            if (player != hero):
+                villain_state = VillainState(player.name, player.chips, player.current_bet, player.folded, player.all_in)
+                villain_states.append(villain_state)
+        return GameState(hero_state, villain_states, self.community_cards, self.total_pot, self.dealer_index, self.small_blind, self.big_blind, self.get_legal_actions(hero), self.current_bet)
+
     def betting_round(self, is_preflop: bool):
-        print(f"{players[self.dealer_index].name} is the dealer")
         first_position = (self.dealer_index+1)%self.num_players
         self.last_to_act = self.dealer_index
         if (self.is_heads_up):
@@ -100,9 +108,10 @@ class TexasHoldem:
 
         p = first_position
         while (True):
-            if players[p].folded == False and players[p].all_in == False:
-                action = players[p].controller.choose_action(self, players[p])
-                self.apply_action(players[p], action)
+            if self.players[p].folded == False and self.players[p].all_in == False:
+                state = self.create_game_state(self.players[p])
+                action = self.players[p].controller.choose_action(state)
+                self.apply_action(self.players[p], action)
 
             if p == self.last_to_act or self.num_players_unfolded == 1:
                 self.reset_round_bets()
@@ -367,8 +376,8 @@ class TexasHoldem:
                                 amount_to_call, min_raise, max_bet)
 
 if __name__ == "__main__":
-    #players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
+    players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
     #players = [Player("Colin", 10000, BasicBot()), Player("Pat", 1000, BasicBot()), Player("Mikey", 1000, BasicBot()), Player("Noah", 1000, BasicBot()), Player("Ethan", 1000, BasicBot()), Player("RV", 1000, BasicBot())]
-    players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, UserController()), Player("Jerry", 1000, UserController())]
+    #players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, UserController()), Player("Jerry", 1000, UserController())]
     game = TexasHoldem(players)
     game.start_game()

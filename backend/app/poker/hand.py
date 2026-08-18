@@ -32,6 +32,8 @@ class Hand:
     
     def __str__(self) -> str:
         output = ""
+        if (len(self.cards)==0):
+            return output
         for i in range (len(self.cards)-1):
             output += f"{self.cards[i]}, "
         output += f"{self.cards[-1]}"
