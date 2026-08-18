@@ -376,8 +376,8 @@ class TexasHoldem:
                                 amount_to_call, min_raise, max_bet)
 
 if __name__ == "__main__":
-    players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
+    #players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
     #players = [Player("Colin", 10000, BasicBot()), Player("Pat", 1000, BasicBot()), Player("Mikey", 1000, BasicBot()), Player("Noah", 1000, BasicBot()), Player("Ethan", 1000, BasicBot()), Player("RV", 1000, BasicBot())]
-    #players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, UserController()), Player("Jerry", 1000, UserController())]
+    players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, UserController()), Player("Jerry", 1000, UserController())]
     game = TexasHoldem(players)
     game.start_game()

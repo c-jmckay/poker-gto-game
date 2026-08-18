@@ -83,9 +83,9 @@ class EquityCalculator:
 if __name__ == "__main__":
     hand = Hand()
     hand.add_card(Card("A", "Spades"))
-    hand.add_card(Card("A", "Hearts"))
+    hand.add_card(Card("A", "Clubs"))
     board = Hand()
     #board.add_card(Card("Q", "Spades"))
     #board.add_card(Card("J", "Spades"))
-    #board.add_card(Card("2", "Clubs"))
-    EquityCalculator.estimate_equity(hand, board, 7)
+    #board.add_card(Card("10", "Spades"))
+    EquityCalculator.estimate_equity(hand, board, 3)
