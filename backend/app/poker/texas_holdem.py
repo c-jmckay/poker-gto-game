@@ -10,6 +10,7 @@ from .pot import Pot
 from .bots.user_controller import UserController
 from .bots.random_bot import RandomBot
 from .bots.basic_bot import BasicBot
+from .bots.equity_bot import EquityBot
 from .state import GameState, HeroState, VillainState
 
 
@@ -287,6 +288,7 @@ class TexasHoldem:
         print(message)
         
     def apply_action(self, player: Player, action: PlayerAction):
+        #print(action)
         legal_actions = self.get_legal_actions(player)
 
         if action.action_type not in legal_actions.actions:
@@ -378,6 +380,6 @@ class TexasHoldem:
 if __name__ == "__main__":
     #players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
     #players = [Player("Colin", 10000, BasicBot()), Player("Pat", 1000, BasicBot()), Player("Mikey", 1000, BasicBot()), Player("Noah", 1000, BasicBot()), Player("Ethan", 1000, BasicBot()), Player("RV", 1000, BasicBot())]
-    players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, UserController()), Player("Jerry", 1000, UserController())]
+    players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, EquityBot()), Player("Jerry", 1000, EquityBot())]
     game = TexasHoldem(players)
     game.start_game()

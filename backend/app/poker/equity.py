@@ -23,7 +23,8 @@ class EquityCalculator:
             elif (result == Sim_Results.TIE):
                 ties += 1
         equity = (wins + ties*.5)/simulations
-        print(f"wins: {wins}, ties: {ties}\nequity: {equity}")
+        return equity
+        #print(f"wins: {wins}, ties: {ties}\nequity: {equity}")
 
     @staticmethod
     def simulate_once(hero_hand: Hand, board: Hand, num_opponents):

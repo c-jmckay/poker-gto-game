@@ -14,6 +14,9 @@ class PlayerAction:
     action_type: ActionType
     amount: int = 0
 
+    def __str__(self) -> str:
+        return f"{self.action_type}, amount={self.amount}"
+
 @dataclass(frozen=True)
 class LegalActions:
     actions: list[ActionType]
