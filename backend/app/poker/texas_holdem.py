@@ -366,10 +366,9 @@ class TexasHoldem:
             return LegalActions([ActionType.CHECK, ActionType.BET, ActionType.ALL_IN], 
                                 0, min_bet, max_bet)
         #player faces a bet, cannot afford calling price
-        elif amount_to_call >= player.chips:
+        elif amount_to_call > player.chips:
             return LegalActions([ActionType.FOLD, ActionType.ALL_IN], amount_to_call, min_raise, max_bet)
         #player faces a bet, cannot afford to raise again without going all in
-        #say in h2h you have 250, raise to 100, v raises to 200, then max_bet is 250 and min_raise is 300
         elif min_raise > max_bet:
             return LegalActions([ActionType.FOLD, ActionType.CALL, ActionType.ALL_IN], amount_to_call, min_raise, max_bet)
         #player faces a bet, can afford to raise
@@ -380,6 +379,6 @@ class TexasHoldem:
 if __name__ == "__main__":
     #players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
     #players = [Player("Colin", 10000, BasicBot()), Player("Pat", 1000, BasicBot()), Player("Mikey", 1000, BasicBot()), Player("Noah", 1000, BasicBot()), Player("Ethan", 1000, BasicBot()), Player("RV", 1000, BasicBot())]
-    players = [Player("Rick", 1000, UserController()), Player("Morty", 1000, EquityBot()), Player("Jerry", 1000, EquityBot())]
+    players = [Player("Rick", 1000, EquityBot()), Player("Morty", 1000, EquityBot()), Player("Jerry", 1000, EquityBot())]
     game = TexasHoldem(players)
     game.start_game()

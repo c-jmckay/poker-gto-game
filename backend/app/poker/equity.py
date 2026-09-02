@@ -12,10 +12,9 @@ class Sim_Results(IntEnum):
 class EquityCalculator:
 
     @staticmethod
-    def estimate_equity(hero_hand: Hand, board: Hand, num_opponents):
+    def estimate_equity(hero_hand: Hand, board: Hand, num_opponents: int, simulations: int):
         wins = 0
         ties = 0
-        simulations = 10000
         for i in range(simulations):
             result = EquityCalculator.simulate_once(hero_hand, board, num_opponents)
             if (result == Sim_Results.WIN):
@@ -89,4 +88,4 @@ if __name__ == "__main__":
     #board.add_card(Card("Q", "Spades"))
     #board.add_card(Card("J", "Spades"))
     #board.add_card(Card("10", "Spades"))
-    EquityCalculator.estimate_equity(hand, board, 3)
+    EquityCalculator.estimate_equity(hand, board, 3, 10000)
