@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>New poker game</title>
+</head>
+<body>
+    <h1>Heads-up poker</h1>
+    <p>Play against BasicBot with 1,000 chips each.</p>
+
+    <form method="post" action="{% url 'tables:new' %}">
+        {% csrf_token %}
+        <button type="submit">New game</button>
+    </form>
+</body>
+</html>
