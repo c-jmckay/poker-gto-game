@@ -6,6 +6,7 @@ from .deck import Deck
 
 class Player:
     def __init__(self, name: str, chips: int, controller=None):
+        self.seat_id: int | None = None
         self.controller = controller
 
         self.hand = Hand()
