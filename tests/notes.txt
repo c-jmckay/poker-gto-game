@@ -1,0 +1,10 @@
+activate the environment
+-> source .venv/bin/activate
+
+run a test
+-> python -m pytest tests/test_hand.py -v
+running a test *including print statements*
+-> python -m pytest tests/test_hand.py -s
+
+run every test in the project
+-> python -m pytest -v
