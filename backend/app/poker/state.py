@@ -10,6 +10,7 @@ class VillainState:
     current_bet: int
     folded: bool
     all_in: bool
+    recent_winnings: int = 0
 
 @dataclass(frozen=True)
 class HeroState:
@@ -20,6 +21,7 @@ class HeroState:
     hand: Hand
     folded: bool
     all_in: bool
+    recent_winnings: int = 0
 
 @dataclass(frozen=True)
 class GameState:

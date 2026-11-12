@@ -145,11 +145,11 @@ class TexasHoldem:
         self.announce_action(f"{self.players[bb_index].name} enters big blind of {bb_amount}.")
     
     def create_game_state(self, hero: Player):
-        hero_state = HeroState(hero.seat_id, hero.name, hero.chips, hero.current_bet, hero.hand, hero.folded, hero.all_in)
+        hero_state = HeroState(hero.seat_id, hero.name, hero.chips, hero.current_bet, hero.hand, hero.folded, hero.all_in, recent_winnings=hero.recent_winnings)
         villain_states = []
         for player in self.players:
             if (player != hero):
-                villain_state = VillainState(player.seat_id, player.name, player.chips, player.current_bet, player.folded, player.all_in)
+                villain_state = VillainState(player.seat_id, player.name, player.chips, player.current_bet, player.folded, player.all_in, recent_winnings=player.recent_winnings)
                 villain_states.append(villain_state)
         return GameState(hero_state, villain_states, self.community_cards, self.total_pot, self.dealer_seat_id, self.small_blind, self.big_blind, self.get_legal_actions(hero)
                          if self.acting_seat_id == hero.seat_id else LegalActions([], 0),

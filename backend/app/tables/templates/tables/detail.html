@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Poker table</title>
+</head>
+
+<body>
+    <h1>Poker table</h1>
+
+    <p>{{ state.street|title }} · Pot: {{ state.pot }} chips</p>
+    {% if state.board %}
+    <p>Board: {{ state.board }}</p>
+{% endif %}
+    <p>Table revision: {{ revision }}</p>
+
+    <h2>Your hand</h2>
+    <p>{{ state.hero.hand }}</p>
+    <p>Your stack: {{ state.hero.chips }} chips</p>
+
+    {% for opponent in state.opponents %}
+    <p>{{ opponent.name }}’s stack: {{ opponent.chips }} chips</p>
+    {% endfor %}
+
+    {% if state.street == "complete" %}
+    <h2>Hand result</h2>
+
+    {% if state.hero.recent_winnings %}
+        <p>You received {{ state.hero.recent_winnings }} chips from the pot.</p>
+    {% endif %}
+
+    {% for opponent in state.opponents %}
+        {% if opponent.recent_winnings %}
+            <p>{{ opponent.name }} received {{ opponent.recent_winnings }} chips from the pot.</p>
+        {% endif %}
+    {% endfor %}
+
+    {% if can_deal_next_hand %}
+        <form method="post" action="{% url 'tables:next_hand' table_id=table_id %}">
+            {% csrf_token %}
+            <input type="hidden" name="revision" value="{{ revision }}">
+            <button type="submit">Next hand</button>
+        </form>
+    {% else %}
+        <p>Game over.</p>
+    {% endif %}
+
+{% elif state.acting_seat_id == state.hero.seat_id %}
+    <p>Your turn.</p>
+
+    <form method="post" action="{% url 'tables:submit_action' table_id=table_id %}">
+        {% csrf_token %}
+        <input type="hidden" name="revision" value="{{ revision }}">
+
+        {% for button in action_buttons %}
+            <button type="submit" name="action" value="{{ button.value }}">
+                {{ button.label }}
+            </button>
+        {% endfor %}
+    </form>
+
+    {% if wager_button %}
+        <form method="post" action="{% url 'tables:submit_action' table_id=table_id %}">
+            {% csrf_token %}
+            <input type="hidden" name="revision" value="{{ revision }}">
+
+            <label for="wager-amount">{{ wager_button.label }} to (chips)</label>
+            <input id="wager-amount"
+                   type="number"
+                   name="amount"
+                   min="{{ state.legal_actions.min_bet }}"
+                   max="{{ state.legal_actions.max_bet }}"
+                   value="{{ state.legal_actions.min_bet }}"
+                   step="1"
+                   required>
+
+            <button type="submit" name="action" value="{{ wager_button.value }}">
+                {{ wager_button.label }}
+            </button>
+        </form>
+    {% endif %}
+{% endif %}
+
+    <a href="{% url 'tables:new' %}">Back to new game</a>
+</body>
+
+</html>
