@@ -17,6 +17,8 @@ from .state import GameState, HeroState, VillainState
 class TexasHoldem:
     def __init__(self, players: list[Player]):
         self.players = players
+        for seat_id, player in enumerate(players):
+            player.seat_id = seat_id
 
         #cards
         self.deck = Deck()
@@ -31,20 +33,20 @@ class TexasHoldem:
         self.min_raise_incr = self.big_blind
 
         #order of play
-        self.dealer_index = 0
+        self._dealer_index = 0
         self.num_players = len(players)
         self.num_players_remaining = self.num_players
         self.num_players_unfolded = self.num_players
         self.hands_played = 0
         self.max_hands_played = 3
-        self.last_to_act = self.dealer_index
+        self._last_to_act_index = self._dealer_index
         self.is_heads_up = (self.num_players == 2)
         
         self.street = "ready"
-        self.acting_seat = None
+        self._acting_index = None
 
     _snapshot_fields = (
-        "street", "acting_seat", "last_to_act", "dealer_index", "hands_played",
+        "street", "hands_played",
         "small_blind", "big_blind", "total_pot", "current_bet", "min_raise_incr",
         "num_players_remaining", "num_players_unfolded",
     )
@@ -66,17 +68,20 @@ class TexasHoldem:
             if controller is not None and self._controllers.get(kind) is not type(controller):
                 raise ValueError(f"Unsupported controller: {kind}")
             fields = {key: getattr(player, key) for key in self._player_fields}
-            players.append(dict(fields, name=player.name, chips=player.chips,
+            players.append(dict(fields, seat_id=player.seat_id, name=player.name, chips=player.chips,
                                 controller=kind, hand=cards(player.hand),
                                 full_hand_rank=list(player.full_hand_rank)))
-        return {"version": 1, "players": players, "deck": cards(self.deck),
+        table = {key: getattr(self, key) for key in self._snapshot_fields}
+        table.update(acting_index=self._acting_index, dealer_index=self._dealer_index,
+                     last_to_act=self._last_to_act_index)
+        return {"version": 2, "players": players, "deck": cards(self.deck),
                 "board": cards(self.community_cards),
-                "table": {key: getattr(self, key) for key in self._snapshot_fields}}
+                "table": table}
 
     @classmethod
     def from_snapshot(cls, snapshot):
         """Restore a trusted server-side snapshot without replaying actions."""
-        if snapshot["version"] != 1:
+        if snapshot["version"] not in (1, 2):
             raise ValueError("Unknown poker snapshot version")
         players = []
         for data in snapshot["players"]:
@@ -89,6 +94,19 @@ class TexasHoldem:
                 setattr(player, key, data[key])
             players.append(player)
         game = cls(players)
+        table = snapshot["table"]
+        if snapshot["version"] == 2:
+            ids = [data["seat_id"] for data in snapshot["players"]]
+            if any(type(i) is not int or i < 0 for i in ids) or len(set(ids)) != len(ids):
+                raise ValueError("Invalid seat IDs in snapshot")
+            for player, seat_id in zip(players, ids):
+                player.seat_id = seat_id
+            game._acting_index = table["acting_index"]
+        else:
+            # Older saves only recorded positions in the surviving roster.
+            game._acting_index = table["acting_seat"]
+        game._dealer_index = table["dealer_index"]
+        game._last_to_act_index = table["last_to_act"]
         game.deck.cards = [Card(*card) for card in snapshot["deck"]]
         game.community_cards.cards = [Card(*card) for card in snapshot["board"]]
         for key in cls._snapshot_fields:
@@ -98,8 +116,7 @@ class TexasHoldem:
     def start_game(self):
         while self.num_players > 1:
             self.start_hand()
-            while self.advance_until_decision() is not None:
-                seat = self.acting_seat
+            while (seat := self.advance_until_decision()) is not None:
                 action = prompt_for_action(self.view_for(seat))
                 self.submit_action(seat, action)
             self.finish_hand()
@@ -115,10 +132,11 @@ class TexasHoldem:
         self.betting_round(True)
 
     def enter_blinds(self):
-        sb_index = (self.dealer_index+1)%self.num_players
+        sb_index = (self._dealer_index+1)%self.num_players
+        bb_index = (self._dealer_index + 2) % self.num_players
         if self.is_heads_up:
-            sb_index = self.dealer_index
-            bb_index = (self.dealer_index + 1) % 2
+            sb_index = self._dealer_index
+            bb_index = (self._dealer_index + 1) % 2
         sb_amount = min(self.small_blind, self.players[sb_index].chips)
         bb_amount = min(self.big_blind, self.players[bb_index].chips)
         self.player_bet(self.players[sb_index], sb_amount)
@@ -127,52 +145,68 @@ class TexasHoldem:
         self.announce_action(f"{self.players[bb_index].name} enters big blind of {bb_amount}.")
     
     def create_game_state(self, hero: Player):
-        hero_state = HeroState(hero.name, hero.chips, hero.current_bet, hero.hand, hero.folded, hero.all_in)
+        hero_state = HeroState(hero.seat_id, hero.name, hero.chips, hero.current_bet, hero.hand, hero.folded, hero.all_in)
         villain_states = []
         for player in self.players:
             if (player != hero):
-                villain_state = VillainState(player.name, player.chips, player.current_bet, player.folded, player.all_in)
+                villain_state = VillainState(player.seat_id, player.name, player.chips, player.current_bet, player.folded, player.all_in)
                 villain_states.append(villain_state)
-        return GameState(hero_state, villain_states, self.community_cards, self.total_pot, self.dealer_index, self.small_blind, self.big_blind, self.get_legal_actions(hero)
-                         if self.acting_seat == self.players.index(hero) else LegalActions([], 0),
-                         self.current_bet, self.street, self.acting_seat)
+        return GameState(hero_state, villain_states, self.community_cards, self.total_pot, self.dealer_seat_id, self.small_blind, self.big_blind, self.get_legal_actions(hero)
+                         if self.acting_seat_id == hero.seat_id else LegalActions([], 0),
+                         self.current_bet, self.street, self.acting_seat_id)
 
     def betting_round(self, is_preflop: bool):
         """Initialize the round cursor without asking any controller for input."""
-        first = self.dealer_index + 1
+        first = self._dealer_index + 1
         if is_preflop:
-            first = self.dealer_index if self.is_heads_up else self.dealer_index + 3
-        self.last_to_act = (first - 1) % self.num_players
+            first = self._dealer_index if self.is_heads_up else self._dealer_index + 3
+        self._last_to_act_index = (first - 1) % self.num_players
         self._select_actor(first % self.num_players)
 
     def _select_actor(self, seat):
-        self.acting_seat = None
+        self._acting_index = None
         while self.num_players_unfolded > 1:
             player = self.players[seat]
             if not player.folded and not player.all_in:
                 if self.num_players_remaining > 1 or player.current_bet < self.current_bet:
-                    self.acting_seat = seat
+                    self._acting_index = seat
                     return
-            if seat == self.last_to_act:
+            if seat == self._last_to_act_index:
                 return
             seat = (seat + 1) % self.num_players
 
-    def view_for(self, seat):
-        """Return a detached, seat-specific view. Seats are zero-based."""
-        if type(seat) is not int or not 0 <= seat < self.num_players:
-            raise ValueError("Unknown seat")
-        state = self.create_game_state(self.players[seat])
-        return deepcopy(state)
+    @property
+    def dealer_seat_id(self):
+        return self.players[self._dealer_index].seat_id
 
-    def submit_action(self, seat, action):
-        if type(seat) is not int or seat != self.acting_seat:
+    @property
+    def acting_seat_id(self):
+        if self._acting_index is None:
+            return None
+        return self.players[self._acting_index].seat_id
+
+    def _index_for_seat(self, seat_id):
+        if type(seat_id) is int:
+            for index, player in enumerate(self.players):
+                if player.seat_id == seat_id:
+                    return index
+        raise ValueError("Unknown seat")
+
+    def view_for(self, seat_id):
+        """Return a detached view for an active table seat ID."""
+        player = self.players[self._index_for_seat(seat_id)]
+        return deepcopy(self.create_game_state(player))
+
+    def submit_action(self, seat_id, action):
+        index = self._index_for_seat(seat_id)
+        if index != self._acting_index:
             raise ValueError("It is not this seat's turn")
         if action.action_type in (ActionType.BET, ActionType.RAISE) and type(action.amount) is not int:
             raise ValueError("Wagers must be whole chips")
-        self.apply_action(self.players[seat], action)
-        self.acting_seat = None
-        if seat != self.last_to_act:
-            self._select_actor((seat + 1) % self.num_players)
+        self.apply_action(self.players[index], action)
+        self._acting_index = None
+        if index != self._last_to_act_index:
+            self._select_actor((index + 1) % self.num_players)
 
     def advance_until_decision(self):
         """Run automatic transitions. Return a human seat or None at hand end."""
@@ -182,9 +216,9 @@ class TexasHoldem:
                    "flop": ("turn", self.deal_turn),
                    "turn": ("river", self.deal_river)}
         while self.street != "complete":
-            seat = self.acting_seat
+            seat = self.acting_seat_id
             if seat is not None:
-                controller = self.players[seat].controller
+                controller = self.players[self._acting_index].controller
                 if controller is None or isinstance(controller, UserController):
                     return seat
                 self.submit_action(seat, controller.choose_action(self.view_for(seat)))
@@ -207,7 +241,7 @@ class TexasHoldem:
         player.bet(size)
         self.total_pot+=size
         if player.current_bet > self.current_bet:
-            self.last_to_act = (self.players.index(player)-1)%self.num_players
+            self._last_to_act_index = (self.players.index(player)-1)%self.num_players
             self.current_bet = player.current_bet
         if (player.chips == 0):
             self.num_players_remaining-=1
@@ -227,7 +261,7 @@ class TexasHoldem:
     def deal_hole_cards(self):
         i = 0
         while (i<self.num_players*2):
-            p = (self.dealer_index+1+i)%(self.num_players)
+            p = (self._dealer_index+1+i)%(self.num_players)
             self.players[p].draw_card(self.deck.draw())
             i+=1
         return
@@ -327,9 +361,9 @@ class TexasHoldem:
         for player in self.players:
             player.reset_hand()
         #button moves to next player with chips
-        self.dealer_index = (self.dealer_index+1)%self.num_players
-        while (self.players[self.dealer_index].chips<=0):
-            self.dealer_index = (self.dealer_index+1)%self.num_players
+        self._dealer_index = (self._dealer_index+1)%self.num_players
+        while (self.players[self._dealer_index].chips<=0):
+            self._dealer_index = (self._dealer_index+1)%self.num_players
         self.remove_losers()
         self.current_bet = 0
         self.total_pot = 0
@@ -342,11 +376,11 @@ class TexasHoldem:
         print("\n")
 
     def remove_losers(self):
-        dealer = self.players[self.dealer_index]
+        dealer = self.players[self._dealer_index]
         self.players = [player for player in self.players if player.chips > 0]
         self.num_players = len(self.players)
         self.is_heads_up = (self.num_players == 2)
-        self.dealer_index = self.players.index(dealer)
+        self._dealer_index = self.players.index(dealer)
     
     def show_winnings(self):
         for player in self.players:
