@@ -7,6 +7,7 @@ from ..equity import EquityCalculator
 from ..state import GameState, HeroState, VillainState
 
 class EquityBot(Controller):
+    ALL_IN_THRESHOLD = 0.95
     RAISE_THRESHOLD = 0.7
     SIMULATIONS = 250
     

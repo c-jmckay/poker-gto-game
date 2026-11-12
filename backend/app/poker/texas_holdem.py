@@ -4,7 +4,7 @@ from .hand import Hand
 from .hand_evaluator import HandEvaluator
 from .player import Player
 from .action import ActionType, PlayerAction, LegalActions
-from collections.abc import Callable
+from copy import deepcopy
 from .prompt_terminal import prompt_for_action
 from .pot import Pot
 from .bots.user_controller import UserController
@@ -40,46 +40,87 @@ class TexasHoldem:
         self.last_to_act = self.dealer_index
         self.is_heads_up = (self.num_players == 2)
         
+        self.street = "ready"
+        self.acting_seat = None
+
+    _snapshot_fields = (
+        "street", "acting_seat", "last_to_act", "dealer_index", "hands_played",
+        "small_blind", "big_blind", "total_pot", "current_bet", "min_raise_incr",
+        "num_players_remaining", "num_players_unfolded",
+    )
+    _player_fields = (
+        "folded", "all_in", "current_bet", "total_contribution", "recent_winnings",
+    )
+    _controllers = {cls.__name__: cls for cls in
+                    (UserController, BasicBot, EquityBot, RandomBot)}
+
+    def to_snapshot(self):
+        """Private JSON-compatible state, including all hidden cards."""
+        def cards(collection):
+            return [[card.rank, card.suit] for card in collection]
+
+        players = []
+        for player in self.players:
+            controller = player.controller
+            kind = None if controller is None else type(controller).__name__
+            if controller is not None and self._controllers.get(kind) is not type(controller):
+                raise ValueError(f"Unsupported controller: {kind}")
+            fields = {key: getattr(player, key) for key in self._player_fields}
+            players.append(dict(fields, name=player.name, chips=player.chips,
+                                controller=kind, hand=cards(player.hand),
+                                full_hand_rank=list(player.full_hand_rank)))
+        return {"version": 1, "players": players, "deck": cards(self.deck),
+                "board": cards(self.community_cards),
+                "table": {key: getattr(self, key) for key in self._snapshot_fields}}
+
+    @classmethod
+    def from_snapshot(cls, snapshot):
+        """Restore a trusted server-side snapshot without replaying actions."""
+        if snapshot["version"] != 1:
+            raise ValueError("Unknown poker snapshot version")
+        players = []
+        for data in snapshot["players"]:
+            kind = data["controller"]
+            controller = cls._controllers[kind]() if kind is not None else None
+            player = Player(data["name"], data["chips"], controller)
+            player.hand.cards = [Card(*card) for card in data["hand"]]
+            player.full_hand_rank = tuple(data["full_hand_rank"])
+            for key in cls._player_fields:
+                setattr(player, key, data[key])
+            players.append(player)
+        game = cls(players)
+        game.deck.cards = [Card(*card) for card in snapshot["deck"]]
+        game.community_cards.cards = [Card(*card) for card in snapshot["board"]]
+        for key in cls._snapshot_fields:
+            setattr(game, key, snapshot["table"][key])
+        return game
+
     def start_game(self):
-        while (self.num_players>1):
+        while self.num_players > 1:
             self.start_hand()
+            while self.advance_until_decision() is not None:
+                seat = self.acting_seat
+                action = prompt_for_action(self.view_for(seat))
+                self.submit_action(seat, action)
             self.finish_hand()
-        self.announce_action(f"{players[0]} wins!")
-        self.announce_action(f"{self.hands_played} hands played.")
-        return
-    
+        self.announce_action(f"{self.players[0]} wins!")
+
     def start_hand(self):
+        """Deal a hand and initialize its first betting decision."""
+        if self.street != "ready" or self.num_players < 2:
+            raise ValueError("A new hand cannot start now")
+        self.street = "preflop"
         self.enter_blinds()
         self.deal_hole_cards()
         self.betting_round(True)
-        if (self.num_players_unfolded>1):
-            self.deal_flop()
-            if (self.num_players_remaining>1):
-                self.betting_round(False)
-        if (self.num_players_unfolded>1):
-            self.deal_turn()
-            if (self.num_players_remaining>1):
-                self.betting_round(False)
-        if (self.num_players_unfolded>1):
-            self.deal_river()
-            if (self.num_players_remaining>1):
-                self.betting_round(False)
-        
-        if (self.num_players_unfolded==1):
-            self.uncontested_win()
-        else:
-            self.showdown()
-        self.show_winnings()
-        return
-    
+
     def enter_blinds(self):
         sb_index = (self.dealer_index+1)%self.num_players
-        sb_amount = min(self.small_blind, self.players[sb_index].chips)
-        bb_index = (self.dealer_index+2)%self.num_players
-        bb_amount = min(self.big_blind, self.players[bb_index].chips)
-        if (self.is_heads_up):
+        if self.is_heads_up:
             sb_index = self.dealer_index
-            bb_index = (self.dealer_index+1)%2
+            bb_index = (self.dealer_index + 1) % 2
+        sb_amount = min(self.small_blind, self.players[sb_index].chips)
+        bb_amount = min(self.big_blind, self.players[bb_index].chips)
         self.player_bet(self.players[sb_index], sb_amount)
         self.announce_action(f"{self.players[sb_index].name} enters small blind of {sb_amount}.")
         self.player_bet(self.players[bb_index], bb_amount)
@@ -92,34 +133,76 @@ class TexasHoldem:
             if (player != hero):
                 villain_state = VillainState(player.name, player.chips, player.current_bet, player.folded, player.all_in)
                 villain_states.append(villain_state)
-        return GameState(hero_state, villain_states, self.community_cards, self.total_pot, self.dealer_index, self.small_blind, self.big_blind, self.get_legal_actions(hero), self.current_bet)
+        return GameState(hero_state, villain_states, self.community_cards, self.total_pot, self.dealer_index, self.small_blind, self.big_blind, self.get_legal_actions(hero)
+                         if self.acting_seat == self.players.index(hero) else LegalActions([], 0),
+                         self.current_bet, self.street, self.acting_seat)
 
     def betting_round(self, is_preflop: bool):
-        first_position = (self.dealer_index+1)%self.num_players
-        self.last_to_act = self.dealer_index
-        if (self.is_heads_up):
-            first_position = (self.dealer_index+1)%2
-            self.last_to_act = self.dealer_index
-        if is_preflop == True:
-            first_position = (self.dealer_index+3)%self.num_players
-            self.last_to_act = (self.dealer_index+2)%self.num_players
-            if (self.is_heads_up):
-                first_position = self.dealer_index
-                self.last_to_act = (self.dealer_index+1)%2
+        """Initialize the round cursor without asking any controller for input."""
+        first = self.dealer_index + 1
+        if is_preflop:
+            first = self.dealer_index if self.is_heads_up else self.dealer_index + 3
+        self.last_to_act = (first - 1) % self.num_players
+        self._select_actor(first % self.num_players)
 
-        p = first_position
-        while (True):
-            if self.players[p].folded == False and self.players[p].all_in == False:
-                state = self.create_game_state(self.players[p])
-                action = self.players[p].controller.choose_action(state)
-                self.apply_action(self.players[p], action)
-
-            if p == self.last_to_act or self.num_players_unfolded == 1:
-                self.reset_round_bets()
-                self.show_pot()
+    def _select_actor(self, seat):
+        self.acting_seat = None
+        while self.num_players_unfolded > 1:
+            player = self.players[seat]
+            if not player.folded and not player.all_in:
+                if self.num_players_remaining > 1 or player.current_bet < self.current_bet:
+                    self.acting_seat = seat
+                    return
+            if seat == self.last_to_act:
                 return
-            p = (p+1)%self.num_players
-    
+            seat = (seat + 1) % self.num_players
+
+    def view_for(self, seat):
+        """Return a detached, seat-specific view. Seats are zero-based."""
+        if type(seat) is not int or not 0 <= seat < self.num_players:
+            raise ValueError("Unknown seat")
+        state = self.create_game_state(self.players[seat])
+        return deepcopy(state)
+
+    def submit_action(self, seat, action):
+        if type(seat) is not int or seat != self.acting_seat:
+            raise ValueError("It is not this seat's turn")
+        if action.action_type in (ActionType.BET, ActionType.RAISE) and type(action.amount) is not int:
+            raise ValueError("Wagers must be whole chips")
+        self.apply_action(self.players[seat], action)
+        self.acting_seat = None
+        if seat != self.last_to_act:
+            self._select_actor((seat + 1) % self.num_players)
+
+    def advance_until_decision(self):
+        """Run automatic transitions. Return a human seat or None at hand end."""
+        if self.street == "ready":
+            self.start_hand()
+        streets = {"preflop": ("flop", self.deal_flop),
+                   "flop": ("turn", self.deal_turn),
+                   "turn": ("river", self.deal_river)}
+        while self.street != "complete":
+            seat = self.acting_seat
+            if seat is not None:
+                controller = self.players[seat].controller
+                if controller is None or isinstance(controller, UserController):
+                    return seat
+                self.submit_action(seat, controller.choose_action(self.view_for(seat)))
+                continue
+            self.reset_round_bets()
+            if self.num_players_unfolded == 1 or self.street == "river":
+                if self.num_players_unfolded == 1:
+                    self.uncontested_win()
+                else:
+                    self.showdown()
+                self.show_winnings()
+                self.street = "complete"
+            else:
+                self.street, deal = streets[self.street]
+                deal()
+                self.betting_round(False)
+        return None
+
     def player_bet(self, player: Player, size: int):
         player.bet(size)
         self.total_pot+=size
@@ -238,11 +321,14 @@ class TexasHoldem:
                 print(f"\n{self.players[i].name} wins the hand before showdown.")
 
     def finish_hand(self):
+        if self.street != "complete":
+            raise ValueError("The hand is still in progress")
+        self.street = "ready"
         for player in self.players:
             player.reset_hand()
         #button moves to next player with chips
         self.dealer_index = (self.dealer_index+1)%self.num_players
-        while (players[self.dealer_index].chips<=0):
+        while (self.players[self.dealer_index].chips<=0):
             self.dealer_index = (self.dealer_index+1)%self.num_players
         self.remove_losers()
         self.current_bet = 0
@@ -257,13 +343,8 @@ class TexasHoldem:
 
     def remove_losers(self):
         dealer = self.players[self.dealer_index]
-        for player in self.players:
-            if player.chips <= 0:
-                self.announce_action(f"{player} leaves the table.")
-                players.remove(player)
-                self.num_players -=1
-                self.dealer_index = self.players.index(dealer)
-                self.remove_losers()
+        self.players = [player for player in self.players if player.chips > 0]
+        self.num_players = len(self.players)
         self.is_heads_up = (self.num_players == 2)
         self.dealer_index = self.players.index(dealer)
     
@@ -314,26 +395,19 @@ class TexasHoldem:
             return
 
         elif action.action_type == ActionType.BET:
-            if action.amount <= 0:
-                raise ValueError(f"Bet {action.amount} must be positive")
-            if action.amount > player.chips:
-                raise ValueError(f"Player cannot afford that bet {action.amount}")
-            
-            if action.amount == player.chips:
-                self.player_bet(player, player.chips)
-                self.announce_action(f"{player} goes all in for {player.current_bet} chips.")
-                return
-            if action.amount >= legal_actions.min_bet:
-                self.min_raise_incr = action.amount - self.current_bet
-                self.player_bet(player, action.amount)
-                self.announce_action(f"{player} bets {player.current_bet} chips.")
-            else: 
-                raise ValueError(f"Bet {action.amount} does not exceed minimum raise {legal_actions.min_bet}")
+            amount_to_add = action.amount - player.current_bet
+            if not 0 < amount_to_add <= player.chips:
+                raise ValueError("Bet outside stack limits")
+            if action.amount < legal_actions.min_bet and amount_to_add != player.chips:
+                raise ValueError("Bet below minimum")
+            self.min_raise_incr = max(self.min_raise_incr, action.amount - self.current_bet)
+            self.player_bet(player, amount_to_add)
+            self.announce_action(f"{player} bets {player.current_bet} chips.")
             return
 
         elif action.action_type == ActionType.RAISE:
             if action.amount <= self.current_bet:
-                raise ValueError(f"Raise {amount_to_add} must exceed the current bet {self.current_bet}")
+                raise ValueError(f"Raise {action.amount} must exceed the current bet {self.current_bet}")
             amount_to_add = action.amount - player.current_bet
             if amount_to_add > player.chips:
                 raise ValueError(f"Player cannot afford that raise {amount_to_add}")

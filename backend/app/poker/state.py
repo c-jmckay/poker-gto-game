@@ -34,6 +34,9 @@ class GameState:
     legal_actions: LegalActions
     current_bet: int
 
+    street: str = "ready"
+    acting_seat: int | None = None
+
     def __str__(self) -> str:
         s = f"Hero = {self.hero.name}, {self.hero.chips} chips, {self.hero.current_bet} current bet, holding {self.hero.hand.cards[0]} and {self.hero.hand.cards[1]}"
         s += f"\nVillains = "

@@ -5,7 +5,7 @@ from .deck import Deck
 #from .bots.controller import Controller
 
 class Player:
-    def __init__(self, name: str, chips: int, controller):
+    def __init__(self, name: str, chips: int, controller=None):
         self.controller = controller
 
         self.hand = Hand()
