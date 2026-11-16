@@ -31,7 +31,7 @@
 
 {% else %}
 {% if waiting_for_step %}
-<form id="advance-table" data-delay="{{ advance_delay }}" method="post" action="{% url 'tables:advance' table_id=table_id %}">
+<form id="advance-table" {% if transition and advance_delay %}data-dealing{% endif %} data-delay="{{ advance_delay }}" method="post" action="{% url 'tables:advance' table_id=table_id %}">
     {% csrf_token %}
     <input type="hidden" name="revision" value="{{ revision }}">
     <noscript><button type="submit">Advance play</button></noscript>

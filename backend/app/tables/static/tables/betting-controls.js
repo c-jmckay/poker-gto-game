@@ -1,3 +1,7 @@
+let controlsController;
+function bindBettingControls(precedingCue) {
+controlsController?.abort();
+controlsController = new AbortController();
 const form = document.querySelector("#betting-controls");
 
 if (form) {
@@ -67,17 +71,20 @@ if (form) {
             event.preventDefault();
             button.click();
         }
-    });
+    }, {signal: controlsController.signal});
 }
 
 const advanceForm = document.querySelector("#advance-table");
 
 if (advanceForm) {
-    const timer = window.setTimeout(() => {
-        advanceForm.requestSubmit();
-    }, Number(advanceForm.dataset.delay));
-
-    advanceForm.addEventListener("submit", () => {
-        window.clearTimeout(timer);
-    }, { once: true });
+    const signal = controlsController.signal;
+    const pause = new Promise(resolve => setTimeout(resolve, Number(advanceForm.dataset.delay)));
+    const sounds = advanceForm.hasAttribute("data-dealing") && precedingCue
+        ? precedingCue.then(() => new Promise(resolve => setTimeout(resolve, 220)))
+        : Promise.resolve();
+    Promise.all([pause, sounds]).then(() => {
+        if (!signal.aborted && advanceForm.isConnected) advanceForm.requestSubmit();
+    });
 }
+}
+bindBettingControls();
