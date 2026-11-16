@@ -40,7 +40,7 @@ def new_table(request):
     human = Player("You", 1000)
     bot = Player("Bot", 1000, EquityBot())
     game = TexasHoldem([human, bot])
-    game.advance_until_decision()
+    game.start_hand()
 
     table = PokerTable.objects.create(
         owner_token=owner_token,
@@ -66,30 +66,59 @@ def table_detail(request, table_id):
     game = TexasHoldem.from_snapshot(table.snapshot)
     state = game.view_for(table.human_seat_id)
 
-    action_buttons = []
-    wager_button = None
+    badges = {
+        event.seat_id: "post" if event.kind in {"small_blind", "big_blind"} else event.kind
+        for event in state.history
+        if event.street == state.street and event.seat_id is not None
+        and event.kind != "payout"
+    }
+
+    actor = next((seat for seat in (state.hero, *state.opponents)
+                  if seat.seat_id == state.acting_seat_id), None)
+    waiting = state.street != "complete" and state.acting_seat_id != state.hero.seat_id
+    transition = ""
+    advance_delay = 0
+    if waiting and actor is not None:
+        advance_delay = 2200
+    elif waiting:
+        next_street = {"preflop": "flop", "flop": "turn", "turn": "river"}.get(state.street)
+        if next_street and game.num_players_unfolded > 1:
+            transition = f"Dealing {next_street}"
+            advance_delay = 1000
+        else:
+            transition = "Settling pot"
+
     legal = state.legal_actions
-
+    wager_button = None
+    call_button = None
     for action in legal.actions:
-        label = BUTTON_LABELS[action]
+        if action in WAGER_ACTIONS and legal.min_bet <= legal.max_bet:
+            wager_button = {"value": action.value, "label": BUTTON_LABELS[action]}
+        elif action in (ActionType.CALL, ActionType.CHECK):
+            label = f"Call {legal.amount_to_call} chips" if action == ActionType.CALL else "Check"
+            call_button = {"value": action.value, "label": label}
 
-        if action in WAGER_ACTIONS:
-            if legal.min_bet <= legal.max_bet:
-                wager_button = {"value": action.value, "label": label}
-            continue
-
-        if action == ActionType.CALL:
-            label = f"Call {legal.amount_to_call} chips"
-
-        action_buttons.append({"value": action.value, "label": label})
-
+    reveals = game.showdown_hands()
+    exposed = {row["seat_id"]: row["hole_cards"] for row in reveals}
     return render(request, "tables/detail.html", {
         "state": state,
         "table_id": table.pk,
         "revision": table.revision,
-        "action_buttons": action_buttons,
+        "hero_badge": badges.get(state.hero.seat_id),
+        "opponent_seats": [(player, badges.get(player.seat_id), exposed.get(player.seat_id))
+                           for player in state.opponents],
+        "reveals": reveals,
+        "display_history": [event for event in state.history if event.kind != "board"],
+        "can_fold": ActionType.FOLD in legal.actions,
+        "can_go_all_in": ActionType.ALL_IN in legal.actions,
+        "call_button": call_button,
+        "transition": transition,
         "wager_button": wager_button,
         "can_deal_next_hand": can_deal_next_hand(state),
+        "waiting_for_step": waiting,
+        "actor": actor,
+        "actor_to_call": min(actor.chips, max(0, state.current_bet - actor.current_bet)) if actor else 0,
+        "advance_delay": advance_delay,
     })
 
 @require_POST
@@ -131,8 +160,6 @@ def submit_action(request, table_id):
         except ValueError as error:
             return HttpResponseBadRequest(str(error))
 
-        game.advance_until_decision()
-
         table.snapshot = game.to_snapshot()
         table.revision += 1
         table.save(update_fields=["snapshot", "revision", "updated_at"])
@@ -163,10 +190,33 @@ def next_hand(request, table_id):
             return HttpResponseBadRequest("This table cannot deal another hand.")
 
         game.finish_hand()
-        game.advance_until_decision()
+        game.start_hand()
 
         table.snapshot = game.to_snapshot()
         table.revision += 1
         table.save(update_fields=["snapshot", "revision", "updated_at"])
+
+    return redirect("tables:detail", table_id=table.pk)
+
+@require_POST
+def advance_table(request, table_id):
+    try:
+        displayed_revision = int(request.POST["revision"])
+    except (KeyError, ValueError):
+        return HttpResponseBadRequest("Invalid table revision.")
+
+    with transaction.atomic():
+        table = get_object_or_404(
+            PokerTable.objects.select_for_update(),
+            pk=table_id,
+            owner_token=request.session.get("poker_owner_token"),
+        )
+
+        if displayed_revision == table.revision:
+            game = TexasHoldem.from_snapshot(table.snapshot)
+            if game.advance_one_step():
+                table.snapshot = game.to_snapshot()
+                table.revision += 1
+                table.save(update_fields=["snapshot", "revision", "updated_at"])
 
     return redirect("tables:detail", table_id=table.pk)
