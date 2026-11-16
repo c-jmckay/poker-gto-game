@@ -1,4 +1,7 @@
 // Keep the preferred radial position when the complete chip label fits there.
+let wagerObserver;
+function bindWagerLayout() {
+wagerObserver?.disconnect();
 const arena = document.querySelector(".live-table");
 if (arena) {
     const seats = [...arena.querySelectorAll(".table-seat")];
@@ -47,7 +50,10 @@ if (arena) {
     }
     if (wagers.length) {
         positionWagers();
-        const observer = new ResizeObserver(positionWagers);
-        for (const element of [arena, board, ...seats, ...wagers]) observer.observe(element);
+        wagerObserver = new ResizeObserver(positionWagers);
+        for (const element of [arena, board, ...seats, ...wagers]) wagerObserver.observe(element);
     }
 }
+
+}
+bindWagerLayout();

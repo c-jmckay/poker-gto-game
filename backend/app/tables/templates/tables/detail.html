@@ -6,15 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Poker Solver · Table</title>
     <link rel="stylesheet" href="{% static 'tables/table.css' %}">
+    <script src="{% static 'tables/sound-controls.js' %}" defer></script>
     <script src="{% static 'tables/betting-controls.js' %}" defer></script>
     <script src="{% static 'tables/wager-layout.js' %}" defer></script>
+    <script src="{% static 'tables/table-sound.js' %}" defer></script>
 </head>
 <body>
+    <audio id="deal-flip" preload="auto" src="{% static 'tables/sounds/card_flip.wav' %}"></audio>
     <header>
         <a class="wordmark" href="{% url 'tables:new' %}">
             POKER<span>SOLVER</span>
         </a>
+        <div class="header-right">
+        {% include "tables/_sound.html" %}
         <a class="outline" href="{% url 'tables:new' %}">New game</a>
+        </div>
     </header>
 
     <main class="table-page">
@@ -61,16 +67,15 @@
         <aside class="sidebar hand-history" aria-labelledby="history-title">
             <h2 id="history-title">Hand history</h2>
             <div class="history-scroll" tabindex="0" role="region" aria-label="Hand history, newest first">
-                {% regroup display_history by street as streets %}
-                {% for group in streets %}
+                {% for street, actions in history_by_street.items %}
                     <div class="history-events">
-                    {% for event in group.list %}
+                    {% for event in actions %}
                         <div class="history-row{% if forloop.first and forloop.parentloop.first %} current{% endif %}">
                             <div class="line">{{ event.text }}</div>
                         </div>
                     {% endfor %}
                     </div>
-                    <div class="history-meta">{{ group.grouper|upper }}</div>
+                    <div class="history-meta">{{ street|upper }}</div>
                 {% empty %}
                     <p>History will appear as the hand progresses.</p>
                 {% endfor %}

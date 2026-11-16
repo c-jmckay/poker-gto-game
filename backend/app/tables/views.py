@@ -71,6 +71,10 @@ def table_detail(request, table_id):
         pk=table_id, 
         owner_token=request.session.get("poker_owner_token"),
     )
+    return render_table(request, table)
+
+
+def render_table(request, table):
     game = TexasHoldem.from_snapshot(table.snapshot)
     state = game.view_for(table.human_seat_id)
 
@@ -106,6 +110,12 @@ def table_detail(request, table_id):
             label = f"Call {legal.amount_to_call} chips" if action == ActionType.CALL else "Check"
             call_button = {"value": action.value, "label": label}
 
+    history_by_street = {}
+    for event in reversed(state.history):
+        actions = history_by_street.setdefault(event.street, [])
+        if event.kind != "board":
+            actions.append(event)
+
     reveals = game.showdown_hands()
     exposed = {row["seat_id"]: row["hole_cards"] for row in reveals}
     return render(request, "tables/detail.html", {
@@ -116,7 +126,7 @@ def table_detail(request, table_id):
         "opponent_seats": [(player, badges.get(player.seat_id), exposed.get(player.seat_id))
                            for player in state.opponents],
         "reveals": reveals,
-        "display_history": [event for event in reversed(state.history) if event.kind != "board"],
+        "history_by_street": history_by_street,
         "can_fold": ActionType.FOLD in legal.actions,
         "can_go_all_in": ActionType.ALL_IN in legal.actions,
         "call_button": call_button,
@@ -128,6 +138,18 @@ def table_detail(request, table_id):
         "actor_to_call": min(actor.chips, max(0, state.current_bet - actor.current_bet)) if actor else 0,
         "advance_delay": advance_delay,
     })
+
+def updated_table(request, table, cue=""):
+    if request.headers.get("X-Table-Update") == "1":
+        response = render_table(request, table)
+        response["X-Poker-Sound"] = cue
+        return response
+    return redirect("tables:detail", table_id=table.pk)
+
+
+def action_sound(kind):
+    return {"fold": "fold", "check": "check", "call": "bet", "bet": "bet", "raise": "bet"}.get(kind, "")
+
 
 @require_POST
 def submit_action(request, table_id):
@@ -172,7 +194,7 @@ def submit_action(request, table_id):
         table.revision += 1
         table.save(update_fields=["snapshot", "revision", "updated_at"])
 
-    return redirect("tables:detail", table_id=table.pk)
+    return updated_table(request, table, action_sound(action_type.value))
 
 @require_POST
 def next_hand(request, table_id):
@@ -204,7 +226,7 @@ def next_hand(request, table_id):
         table.revision += 1
         table.save(update_fields=["snapshot", "revision", "updated_at"])
 
-    return redirect("tables:detail", table_id=table.pk)
+    return updated_table(request, table)
 
 @require_POST
 def advance_table(request, table_id):
@@ -213,6 +235,7 @@ def advance_table(request, table_id):
     except (KeyError, ValueError):
         return HttpResponseBadRequest("Invalid table revision.")
 
+    cue = ""
     with transaction.atomic():
         table = get_object_or_404(
             PokerTable.objects.select_for_update(),
@@ -222,9 +245,17 @@ def advance_table(request, table_id):
 
         if displayed_revision == table.revision:
             game = TexasHoldem.from_snapshot(table.snapshot)
+            previous_events = len(game.history)
             if game.advance_one_step():
+                events = game.history[previous_events:]
+                if game.street == "complete" and any(e.kind == "payout" for e in events):
+                    cue = "stack"
+                elif any(e.kind == "board" for e in events):
+                    cue = "flip"
+                elif events:
+                    cue = action_sound(events[-1].kind)
                 table.snapshot = game.to_snapshot()
                 table.revision += 1
                 table.save(update_fields=["snapshot", "revision", "updated_at"])
 
-    return redirect("tables:detail", table_id=table.pk)
+    return updated_table(request, table, cue)

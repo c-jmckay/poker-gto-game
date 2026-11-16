@@ -7,10 +7,11 @@
     <title>Set up your table · Poker Solver</title>
     <link rel="stylesheet" href="{% static 'tables/table.css' %}">
     <link rel="stylesheet" href="{% static 'tables/lobby.css' %}">
+    <script src="{% static 'tables/sound-controls.js' %}" defer></script>
     <script src="{% static 'tables/lobby.js' %}" defer></script>
 </head>
 <body class="setup-page">
-<header><a class="wordmark" href="{% url 'tables:new' %}">POKER<span>SOLVER</span></a></header>
+<header><a class="wordmark" href="{% url 'tables:new' %}">POKER<span>SOLVER</span></a>{% include "tables/_sound.html" %}</header>
 <main class="setup-layout">
     <form class="setup-controls" method="post">
         {% csrf_token %}

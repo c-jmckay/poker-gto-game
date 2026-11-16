@@ -22,6 +22,10 @@ setup.addEventListener("submit", event => {
     }
     start.disabled = true;
     start.textContent = "Starting…";
+    if (enabled) {
+        event.preventDefault();
+        afterButtonClick(() => setup.submit());
+    }
 });
 window.addEventListener("pageshow", () => {
     start.disabled = false;
