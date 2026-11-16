@@ -24,6 +24,13 @@ class HeroState:
     recent_winnings: int = 0
 
 @dataclass(frozen=True)
+class HandEvent:
+    street: str
+    kind: str
+    text: str
+    seat_id: int | None = None
+
+@dataclass(frozen=True)
 class GameState:
     hero: HeroState
     opponents: list[VillainState]
@@ -40,6 +47,8 @@ class GameState:
 
     street: str = "ready"
     acting_seat_id: int | None = None
+
+    history: tuple[HandEvent, ...] = ()
 
     def __str__(self) -> str:
         s = f"Hero = {self.hero.name}, {self.hero.chips} chips, {self.hero.current_bet} current bet, holding {self.hero.hand.cards[0]} and {self.hero.hand.cards[1]}"

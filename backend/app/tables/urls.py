@@ -9,4 +9,5 @@ urlpatterns = [
     path("<uuid:table_id>/", views.table_detail, name="detail"),
     path("<uuid:table_id>/actions/", views.submit_action, name="submit_action"),
     path("<uuid:table_id>/next-hand/", views.next_hand, name="next_hand"),
+    path("<uuid:table_id>/advance/", views.advance_table, name="advance"),
 ]

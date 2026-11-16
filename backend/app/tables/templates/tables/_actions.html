@@ -1,0 +1,96 @@
+{% if state.street == "complete" %}
+{% if not reveals %}<h2>Hand result</h2>{% endif %}
+{% for reveal in reveals %}
+<div class="showdown-row">
+    <span><strong>{{ reveal.name }}</strong> {% if reveal.name == "You" %}reveal{% else %}reveals{% endif %} {{ reveal.rank }}</span>
+    <div class="showdown-cards">
+        {% for card in reveal.cards %}{% include "tables/_card.html" with card=card only %}{% endfor %}
+    </div>
+</div>
+{% endfor %}
+
+{% if state.hero.recent_winnings %}
+<h3>You received {{ state.hero.recent_winnings }} chips from the pot.</h3>
+{% endif %}
+
+{% for opponent in state.opponents %}
+{% if opponent.recent_winnings %}
+<h3>{{ opponent.name }} received {{ opponent.recent_winnings }} chips from the pot.</h3>
+{% endif %}
+{% endfor %}
+
+{% if can_deal_next_hand %}
+<form method="post" action="{% url 'tables:next_hand' table_id=table_id %}">
+    {% csrf_token %}
+    <input type="hidden" name="revision" value="{{ revision }}">
+    <button type="submit" class="next-hand">Next hand</button>
+</form>
+{% else %}
+<p>Game over.</p>
+{% endif %}
+
+{% else %}
+{% if waiting_for_step %}
+<form id="advance-table" data-delay="{{ advance_delay }}" method="post" action="{% url 'tables:advance' table_id=table_id %}">
+    {% csrf_token %}
+    <input type="hidden" name="revision" value="{{ revision }}">
+    <noscript><button type="submit">Advance play</button></noscript>
+</form>
+{% endif %}
+{% if actor %}
+<div class="action-heading" aria-live="polite">
+    <h2>Action is on {% if actor.seat_id == state.hero.seat_id %}you{% else %}{{ actor.name }}{% endif %}{% if actor_to_call %}. <span class="turn-price">{{ actor_to_call }} to call</span>{% endif %}</h2>
+</div>
+{% else %}
+<div class="action-heading" aria-live="polite"><h2>{{ transition }}</h2></div>
+{% endif %}
+
+<form id="betting-controls" method="post" action="{% url 'tables:submit_action' table_id=table_id %}"
+    data-pot="{{ state.pot }}" data-call="{{ state.legal_actions.amount_to_call }}"
+    data-committed="{{ state.hero.current_bet }}">
+    {% csrf_token %}
+    <input type="hidden" name="revision" value="{{ revision }}">
+
+    <fieldset class="turn-controls" aria-label="Betting controls"{% if waiting_for_step %} disabled{% endif %}>
+    <fieldset class="sizing" aria-label="Wager sizing"{% if not wager_button %} disabled{% endif %}>
+        <label class="muted" for="amount">{{ wager_button.label|default:"Wager" }} to</label>
+
+        <div class="amount-wrap">
+            <span aria-hidden="true">◉</span>
+            <input id="amount" name="amount" type="number" min="{{ state.legal_actions.min_bet|default_if_none:"0" }}"
+                max="{{ state.legal_actions.max_bet|default_if_none:"0" }}" value="{{ state.legal_actions.min_bet|default_if_none:"0" }}" step="1" required>
+        </div>
+
+        <input id="slider" type="range" aria-label="{{ wager_button.label }} total"
+            min="{{ state.legal_actions.min_bet|default_if_none:"0" }}" max="{{ state.legal_actions.max_bet|default_if_none:"0" }}"
+            value="{{ state.legal_actions.min_bet|default_if_none:"0" }}" step="1">
+
+        <div class="presets">
+            <button type="button" data-size="0.5">½ pot</button>
+            <button type="button" data-size="0.75">¾ pot</button>
+            <button type="button" data-size="1">Pot</button>
+            <button type="button" data-size="all">All in</button>
+        </div>
+    </fieldset>
+
+    <div class="action-buttons">
+        <button class="fold" type="submit" name="action" value="fold" data-key="f" formnovalidate{% if not can_fold %} disabled{% endif %}>
+            Fold <kbd>F</kbd>
+        </button>
+        <button class="call" type="submit" name="action" value="{{ call_button.value }}" data-key="c" formnovalidate{% if not call_button %} disabled{% endif %}>
+            {{ call_button.label|default:"Check / Call" }} <kbd>C</kbd>
+        </button>
+        {% if wager_button %}
+        <button class="raise" type="submit" name="action" value="{{ wager_button.value }}" data-key="r">
+            <span>{{ wager_button.label }} to <span id="wager-total">{{ state.legal_actions.min_bet|default_if_none:"0" }}</span></span>
+            <kbd>R</kbd>
+        </button>
+        {% elif can_go_all_in %}
+        <button class="raise" type="submit" name="action" value="all in" formnovalidate>All in</button>
+        {% else %}
+        <button class="raise" type="button" disabled>Bet / Raise</button>
+        {% endif %}
+    </div>
+    </fieldset>
+</form>
+{% endif %}

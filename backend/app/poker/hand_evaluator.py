@@ -132,17 +132,17 @@ class HandEvaluator:
         return False
             
     @staticmethod
+    def best_five(hand):
+        best_rank, best_cards = (0,), ()
+        for cards in combinations(hand, 5):
+            rank = HandEvaluator.evaluate(cards)
+            if rank > best_rank:
+                best_rank, best_cards = rank, cards
+        return best_rank, best_cards
+
+    @staticmethod
     def evaluate_perms(hand: Hand):
-        cur = (0,)
-        for combo in combinations(hand,5):
-            if HandEvaluator.evaluate(combo) > cur:
-                cur = HandEvaluator.evaluate(combo)
-                #print(cur)
-                #five = Hand()
-                #for card in combo:
-                #    five.add_card(card)
-                #print(five)
-        return cur
+        return HandEvaluator.best_five(hand)[0]
     
 #if __name__ == "__main__":
 #    hand = Hand()

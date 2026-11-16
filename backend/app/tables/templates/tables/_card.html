@@ -1,0 +1,7 @@
+<div class="card {{ card.suit|lower }}{% if card.suit == 'Hearts' or card.suit == 'Diamonds' %} red{% endif %}"
+     role="img" aria-label="{{ card.rank }} of {{ card.suit }}">
+    <span class="rank" aria-hidden="true">{{ card.rank }}</span>
+    <span class="large-suit" aria-hidden="true">
+        {% if card.suit == "Hearts" %}♥{% elif card.suit == "Diamonds" %}♦{% elif card.suit == "Clubs" %}♣{% else %}♠{% endif %}
+    </span>
+</div>

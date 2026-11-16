@@ -1,0 +1,30 @@
+<div class="table-seat {% if is_hero %}hero-seat{% else %}seat heads-up-opponent{% endif %}{% if player.folded %} folded{% endif %}{% if state.acting_seat_id == player.seat_id %} is-acting{% endif %}"
+     data-seat="{{ player.seat_id }}">
+    {% if is_hero %}
+        <div class="hero-cards">
+            {% for card in player.hand %}{% include "tables/_card.html" with card=card only %}{% endfor %}
+        </div>
+    {% elif hole_cards %}
+        <div class="revealed-pocket" aria-label="Revealed hole cards">
+            {% for card in hole_cards %}{% include "tables/_card.html" with card=card only %}{% endfor %}
+        </div>
+    {% else %}
+        <div class="seat-card-backs" role="img" aria-label="Two face-down cards">
+            <span class="card-back"></span><span class="card-back"></span>
+        </div>
+    {% endif %}
+    <div class="seat-plate">
+        <span class="seat-avatar" aria-hidden="true">{{ player.name|first|upper }}</span>
+        <div class="seat-identity">
+            <strong>{{ player.name }}</strong>
+            <span aria-label="Stack: {{ player.chips }} chips">{{ player.chips|floatformat:"0g" }}</span>
+        </div>
+        {% if player.seat_id == state.dealer_seat_id %}<span class="dealer" aria-label="Dealer">D</span>{% endif %}
+        <span class="seat-action"><span aria-hidden="true" class="seat-action-sizer">raise</span><span>{{ badge|default:"" }}</span></span>
+    </div>
+    {% if player.current_bet %}
+        <div class="felt-wager" aria-label="{{ player.name }} contributed {{ player.current_bet }} chips this street">
+            <i aria-hidden="true"></i>{{ player.current_bet|floatformat:"0g" }}
+        </div>
+    {% endif %}
+</div>

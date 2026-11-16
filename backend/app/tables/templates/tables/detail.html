@@ -1,88 +1,78 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8">
-    <title>Poker table</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Poker Solver · Table</title>
+    <link rel="stylesheet" href="{% static 'tables/table.css' %}">
+    <script src="{% static 'tables/betting-controls.js' %}" defer></script>
 </head>
-
 <body>
-    <h1>Poker table</h1>
+    <header>
+        <a class="wordmark" href="{% url 'tables:new' %}">
+            POKER<span>SOLVER</span>
+        </a>
+        <a class="outline" href="{% url 'tables:new' %}">New game</a>
+    </header>
 
-    <p>{{ state.street|title }} · Pot: {{ state.pot }} chips</p>
-    {% if state.board %}
-    <p>Board: {{ state.board }}</p>
-{% endif %}
-    <p>Table revision: {{ revision }}</p>
+    <main class="table-page">
+        <section class="game" aria-label="Heads-up poker table">
+            <div class="table-bar">
+                <div><span class="live-dot"></span> Hold’em / Heads-up</div>
+                <span class="stakes">
+                    {{ state.small_blind }} / {{ state.big_blind }} blinds
+                </span>
+            </div>
 
-    <h2>Your hand</h2>
-    <p>{{ state.hero.hand }}</p>
-    <p>Your stack: {{ state.hero.chips }} chips</p>
+            <div class="arena">
+                <div class="felt" aria-hidden="true">
+                    <div class="felt-inner"></div>
+                </div>
 
-    {% for opponent in state.opponents %}
-    <p>{{ opponent.name }}’s stack: {{ opponent.chips }} chips</p>
-    {% endfor %}
+                {% for opponent, badge, hole_cards in opponent_seats %}
+                    {% include "tables/_seat.html" with player=opponent is_hero=False %}
+                {% endfor %}
 
-    {% if state.street == "complete" %}
-    <h2>Hand result</h2>
+                <div class="board-zone">
+                    <div class="pot-label">Total pot</div>
+                    <div class="pot">{{ state.pot }}</div>
+                    <div class="board" aria-label="Community cards">
+                        {% for card in state.board %}
+                            {% include "tables/_card.html" with card=card only %}
+                        {% endfor %}
+                        {% for slot in "12345" %}
+                            {% if forloop.counter > state.board|length %}
+                                <div class="card empty" aria-hidden="true"></div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div class="street">{{ state.street|upper }}</div>
+                </div>
 
-    {% if state.hero.recent_winnings %}
-        <p>You received {{ state.hero.recent_winnings }} chips from the pot.</p>
-    {% endif %}
+                {% include "tables/_seat.html" with player=state.hero badge=hero_badge is_hero=True %}
+            </div>
 
-    {% for opponent in state.opponents %}
-        {% if opponent.recent_winnings %}
-            <p>{{ opponent.name }} received {{ opponent.recent_winnings }} chips from the pot.</p>
-        {% endif %}
-    {% endfor %}
+            <div class="action-panel">
+                {% include "tables/_actions.html" %}
+            </div>
+        </section>
+        <aside class="sidebar" aria-labelledby="history-title">
+    <h2 id="history-title">Hand history</h2>
 
-    {% if can_deal_next_hand %}
-        <form method="post" action="{% url 'tables:next_hand' table_id=table_id %}">
-            {% csrf_token %}
-            <input type="hidden" name="revision" value="{{ revision }}">
-            <button type="submit">Next hand</button>
-        </form>
-    {% else %}
-        <p>Game over.</p>
-    {% endif %}
+    {% regroup display_history by street as streets %}
+    {% for group in streets %}
+        <div class="history-meta">{{ group.grouper|upper }}</div>
 
-{% elif state.acting_seat_id == state.hero.seat_id %}
-    <p>Your turn.</p>
-
-    <form method="post" action="{% url 'tables:submit_action' table_id=table_id %}">
-        {% csrf_token %}
-        <input type="hidden" name="revision" value="{{ revision }}">
-
-        {% for button in action_buttons %}
-            <button type="submit" name="action" value="{{ button.value }}">
-                {{ button.label }}
-            </button>
+        {% for event in group.list %}
+            <div class="history-row{% if forloop.last and forloop.parentloop.last %} current{% endif %}">
+                <div class="line">{{ event.text }}</div>
+            </div>
         {% endfor %}
-    </form>
-
-    {% if wager_button %}
-        <form method="post" action="{% url 'tables:submit_action' table_id=table_id %}">
-            {% csrf_token %}
-            <input type="hidden" name="revision" value="{{ revision }}">
-
-            <label for="wager-amount">{{ wager_button.label }} to (chips)</label>
-            <input id="wager-amount"
-                   type="number"
-                   name="amount"
-                   min="{{ state.legal_actions.min_bet }}"
-                   max="{{ state.legal_actions.max_bet }}"
-                   value="{{ state.legal_actions.min_bet }}"
-                   step="1"
-                   required>
-
-            <button type="submit" name="action" value="{{ wager_button.value }}">
-                {{ wager_button.label }}
-            </button>
-        </form>
-    {% endif %}
-{% endif %}
-
-    <a href="{% url 'tables:new' %}">Back to new game</a>
+    {% empty %}
+        <p>History will appear as the hand progresses.</p>
+    {% endfor %}
+</aside>
+    </main>
 </body>
-
 </html>

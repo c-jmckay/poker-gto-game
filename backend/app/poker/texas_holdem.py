@@ -2,6 +2,7 @@ from .deck import Deck
 from .card import Card
 from .hand import Hand
 from .hand_evaluator import HandEvaluator
+from .hand_description import describe_hand
 from .player import Player
 from .action import ActionType, PlayerAction, LegalActions
 from copy import deepcopy
@@ -11,7 +12,9 @@ from .bots.user_controller import UserController
 from .bots.random_bot import RandomBot
 from .bots.basic_bot import BasicBot
 from .bots.equity_bot import EquityBot
-from .state import GameState, HeroState, VillainState
+from .state import GameState, HeroState, VillainState, HandEvent
+
+from dataclasses import asdict
 
 
 class TexasHoldem:
@@ -45,6 +48,8 @@ class TexasHoldem:
         self.street = "ready"
         self._acting_index = None
 
+        self.history: list[HandEvent] = []
+
     _snapshot_fields = (
         "street", "hands_played",
         "small_blind", "big_blind", "total_pot", "current_bet", "min_raise_incr",
@@ -76,7 +81,8 @@ class TexasHoldem:
                      last_to_act=self._last_to_act_index)
         return {"version": 2, "players": players, "deck": cards(self.deck),
                 "board": cards(self.community_cards),
-                "table": table}
+                "table": table,
+                "history": [asdict(event) for event in self.history]}
 
     @classmethod
     def from_snapshot(cls, snapshot):
@@ -111,6 +117,9 @@ class TexasHoldem:
         game.community_cards.cards = [Card(*card) for card in snapshot["board"]]
         for key in cls._snapshot_fields:
             setattr(game, key, snapshot["table"][key])
+        game.history = [
+            HandEvent(**event) for event in snapshot.get("history", [])
+        ]
         return game
 
     def start_game(self):
@@ -123,6 +132,7 @@ class TexasHoldem:
         self.announce_action(f"{self.players[0]} wins!")
 
     def start_hand(self):
+        self.history.clear()
         """Deal a hand and initialize its first betting decision."""
         if self.street != "ready" or self.num_players < 2:
             raise ValueError("A new hand cannot start now")
@@ -139,8 +149,16 @@ class TexasHoldem:
             bb_index = (self._dealer_index + 1) % 2
         sb_amount = min(self.small_blind, self.players[sb_index].chips)
         bb_amount = min(self.big_blind, self.players[bb_index].chips)
+        small_blind = self.players[sb_index]
+        self._record_event(
+            "small_blind", f"{small_blind.name} posts {sb_amount}", small_blind
+        )
         self.player_bet(self.players[sb_index], sb_amount)
         self.announce_action(f"{self.players[sb_index].name} enters small blind of {sb_amount}.")
+        big_blind = self.players[bb_index]
+        self._record_event(
+            "big_blind", f"{big_blind.name} posts {bb_amount}", big_blind
+        )
         self.player_bet(self.players[bb_index], bb_amount)
         self.announce_action(f"{self.players[bb_index].name} enters big blind of {bb_amount}.")
     
@@ -153,7 +171,7 @@ class TexasHoldem:
                 villain_states.append(villain_state)
         return GameState(hero_state, villain_states, self.community_cards, self.total_pot, self.dealer_seat_id, self.small_blind, self.big_blind, self.get_legal_actions(hero)
                          if self.acting_seat_id == hero.seat_id else LegalActions([], 0),
-                         self.current_bet, self.street, self.acting_seat_id)
+                         self.current_bet, self.street, self.acting_seat_id, history=tuple(self.history))
 
     def betting_round(self, is_preflop: bool):
         """Initialize the round cursor without asking any controller for input."""
@@ -203,40 +221,84 @@ class TexasHoldem:
             raise ValueError("It is not this seat's turn")
         if action.action_type in (ActionType.BET, ActionType.RAISE) and type(action.amount) is not int:
             raise ValueError("Wagers must be whole chips")
-        self.apply_action(self.players[index], action)
+        player = self.players[index]
+        chips_before = player.chips
+        self.apply_action(player, action)
+
+        paid = chips_before - player.chips
+        descriptions = {
+            ActionType.FOLD: "folds",
+            ActionType.CHECK: "checks",
+            ActionType.CALL: f"calls {paid}",
+            ActionType.BET: f"bets {player.current_bet}",
+            ActionType.RAISE: f"raises to {player.current_bet}",
+            ActionType.ALL_IN: f"goes all in for {player.current_bet} total",
+        }
+        self._record_event(
+            action.action_type.value,
+            f"{player.name} {descriptions[action.action_type]}",
+            player,
+        )
         self._acting_index = None
         if index != self._last_to_act_index:
             self._select_actor((index + 1) % self.num_players)
-
-    def advance_until_decision(self):
-        """Run automatic transitions. Return a human seat or None at hand end."""
+        
+    def advance_one_step(self):
+        #Perform one automatic step. Return True if the game changed.
         if self.street == "ready":
             self.start_hand()
-        streets = {"preflop": ("flop", self.deal_flop),
-                   "flop": ("turn", self.deal_turn),
-                   "turn": ("river", self.deal_river)}
-        while self.street != "complete":
-            seat = self.acting_seat_id
-            if seat is not None:
-                controller = self.players[self._acting_index].controller
-                if controller is None or isinstance(controller, UserController):
-                    return seat
-                self.submit_action(seat, controller.choose_action(self.view_for(seat)))
-                continue
-            self.reset_round_bets()
-            if self.num_players_unfolded == 1 or self.street == "river":
-                if self.num_players_unfolded == 1:
-                    self.uncontested_win()
-                else:
-                    self.showdown()
-                self.show_winnings()
-                self.street = "complete"
-            else:
-                self.street, deal = streets[self.street]
-                deal()
-                self.betting_round(False)
-        return None
+            return True
 
+        if self.street == "complete":
+            return False
+
+        seat = self.acting_seat_id
+        if seat is not None:
+            controller = self.players[self._acting_index].controller
+            if controller is None or isinstance(controller, UserController):
+                return False
+
+            action = controller.choose_action(self.view_for(seat))
+            self.submit_action(seat, action)
+            return True
+
+        # No pending actor means the betting round has ended.
+        self.reset_round_bets()
+
+        if self.num_players_unfolded == 1 or self.street == "river":
+            if self.num_players_unfolded == 1:
+                self.uncontested_win()
+            else:
+                self.showdown()
+
+            self.show_winnings()
+            for player in self.players:
+                if player.recent_winnings:
+                    self._record_event(
+                        "payout",
+                        f"{player.name} receives {player.recent_winnings} chips",
+                        player,
+                    )
+            self.street = "complete"
+            return True
+
+        streets = {
+            "preflop": ("flop", self.deal_flop),
+            "flop": ("turn", self.deal_turn),
+            "turn": ("river", self.deal_river),
+        }
+        self.street, deal = streets[self.street]
+        deal()
+        self._record_event("board", f"{self.street.title()} dealt")
+        self.betting_round(False)
+        return True
+    
+    def advance_until_decision(self):
+        while self.advance_one_step():
+            pass
+        return self.acting_seat_id
+
+    
     def player_bet(self, player: Player, size: int):
         player.bet(size)
         self.total_pot+=size
@@ -297,6 +359,26 @@ class TexasHoldem:
         pots: list[Pot] = self.construct_side_pots()
         for pot in pots:
             self.award_pot(pot)
+
+    def showdown_hands(self):
+        """Public reveals for a settled, contested hand in seat order."""
+        if self.street != "complete" or self.num_players_unfolded < 2:
+            return []
+        reveals = []
+        for player in self.players:
+            if player.folded:
+                continue
+            rank, cards = HandEvaluator.best_five([*self.community_cards, *player.hand])
+            reveals.append({
+                "seat_id": player.seat_id, "name": player.name,
+                "hole_cards": tuple(player.hand),
+                "rank": rank,
+                "cards": sorted(cards, key=lambda card: card.value, reverse=True),
+            })
+        ranks = [reveal["rank"] for reveal in reveals]
+        for reveal in reveals:
+            reveal["rank"] = describe_hand(reveal["rank"], ranks)
+        return reveals
 
     def evaluate_player_hands(self):
         for player in self.players:
@@ -483,6 +565,14 @@ class TexasHoldem:
         else:
             return LegalActions([ActionType.FOLD, ActionType.CALL, ActionType.RAISE, ActionType.ALL_IN], 
                                 amount_to_call, min_raise, max_bet)
+
+    def _record_event(self, kind, text, player=None):
+        self.history.append(HandEvent(
+            street=self.street,
+            kind=kind,
+            text=text,
+            seat_id=player.seat_id if player is not None else None,
+        ))
 
 if __name__ == "__main__":
     #players = [Player("Colin", 1000, UserController()), Player("Brooke", 1000, BasicBot()), Player("Ella", 1000, BasicBot()), Player("Ray", 1000, BasicBot()), Player("Ty", 1000, BasicBot())]
