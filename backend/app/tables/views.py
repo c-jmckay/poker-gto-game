@@ -29,8 +29,15 @@ WAGER_ACTIONS = {ActionType.BET, ActionType.RAISE}
 
 @require_http_methods(["GET", "POST"])
 def new_table(request):
+    choices = range(1, 8)
     if request.method == "GET":
-        return render(request, "tables/new_table.html")
+        return render(request, "tables/new_table.html", {"choices": choices})
+    count = request.POST.get("bot_count", "1")
+    if count not in {str(n) for n in choices}:
+        return render(request, "tables/new_table.html", {
+            "choices": choices, "error": "Choose between 1 and 7 bots.",
+        }, status=400)
+    count = int(count)
     
     owner_token = request.session.get("poker_owner_token")
     if owner_token is None:
@@ -38,8 +45,9 @@ def new_table(request):
         request.session["poker_owner_token"] = owner_token
 
     human = Player("You", 1000)
-    bot = Player("Bot", 1000, EquityBot())
-    game = TexasHoldem([human, bot])
+    bots = [Player("Bot" if count == 1 else f"Bot {i + 1}", 1000, EquityBot())
+            for i in range(count)]
+    game = TexasHoldem([human, *bots])
     game.start_hand()
 
     table = PokerTable.objects.create(
@@ -108,7 +116,7 @@ def table_detail(request, table_id):
         "opponent_seats": [(player, badges.get(player.seat_id), exposed.get(player.seat_id))
                            for player in state.opponents],
         "reveals": reveals,
-        "display_history": [event for event in state.history if event.kind != "board"],
+        "display_history": [event for event in reversed(state.history) if event.kind != "board"],
         "can_fold": ActionType.FOLD in legal.actions,
         "can_go_all_in": ActionType.ALL_IN in legal.actions,
         "call_button": call_button,
