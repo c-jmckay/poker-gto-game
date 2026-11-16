@@ -7,6 +7,7 @@
     <title>Poker Solver · Table</title>
     <link rel="stylesheet" href="{% static 'tables/table.css' %}">
     <script src="{% static 'tables/betting-controls.js' %}" defer></script>
+    <script src="{% static 'tables/wager-layout.js' %}" defer></script>
 </head>
 <body>
     <header>
@@ -17,26 +18,26 @@
     </header>
 
     <main class="table-page">
-        <section class="game" aria-label="Heads-up poker table">
+        <section class="game" aria-label="Poker table">
             <div class="table-bar">
-                <div><span class="live-dot"></span> Hold’em / Heads-up</div>
+                <div><span class="live-dot"></span> Hold’em / {% if state.opponents|length == 1 %}Heads-up{% else %}{{ state.opponents|length|add:"1" }} players{% endif %}</div>
                 <span class="stakes">
                     {{ state.small_blind }} / {{ state.big_blind }} blinds
                 </span>
             </div>
 
-            <div class="arena">
+            <div class="arena live-table" style="--players: {{ state.opponents|length|add:'1' }}">
                 <div class="felt" aria-hidden="true">
                     <div class="felt-inner"></div>
                 </div>
 
                 {% for opponent, badge, hole_cards in opponent_seats %}
-                    {% include "tables/_seat.html" with player=opponent is_hero=False %}
+                    {% include "tables/_seat.html" with player=opponent is_hero=False position=forloop.counter %}
                 {% endfor %}
 
                 <div class="board-zone">
                     <div class="pot-label">Total pot</div>
-                    <div class="pot">{{ state.pot }}</div>
+                    <div class="pot"><i class="chip-icon" aria-hidden="true"></i>{{ state.pot }}</div>
                     <div class="board" aria-label="Community cards">
                         {% for card in state.board %}
                             {% include "tables/_card.html" with card=card only %}
@@ -50,29 +51,31 @@
                     <div class="street">{{ state.street|upper }}</div>
                 </div>
 
-                {% include "tables/_seat.html" with player=state.hero badge=hero_badge is_hero=True %}
+                {% include "tables/_seat.html" with player=state.hero badge=hero_badge is_hero=True position=0 %}
             </div>
 
             <div class="action-panel">
                 {% include "tables/_actions.html" %}
             </div>
         </section>
-        <aside class="sidebar" aria-labelledby="history-title">
-    <h2 id="history-title">Hand history</h2>
-
-    {% regroup display_history by street as streets %}
-    {% for group in streets %}
-        <div class="history-meta">{{ group.grouper|upper }}</div>
-
-        {% for event in group.list %}
-            <div class="history-row{% if forloop.last and forloop.parentloop.last %} current{% endif %}">
-                <div class="line">{{ event.text }}</div>
+        <aside class="sidebar hand-history" aria-labelledby="history-title">
+            <h2 id="history-title">Hand history</h2>
+            <div class="history-scroll" tabindex="0" role="region" aria-label="Hand history, newest first">
+                {% regroup display_history by street as streets %}
+                {% for group in streets %}
+                    <div class="history-events">
+                    {% for event in group.list %}
+                        <div class="history-row{% if forloop.first and forloop.parentloop.first %} current{% endif %}">
+                            <div class="line">{{ event.text }}</div>
+                        </div>
+                    {% endfor %}
+                    </div>
+                    <div class="history-meta">{{ group.grouper|upper }}</div>
+                {% empty %}
+                    <p>History will appear as the hand progresses.</p>
+                {% endfor %}
             </div>
-        {% endfor %}
-    {% empty %}
-        <p>History will appear as the hand progresses.</p>
-    {% endfor %}
-</aside>
+        </aside>
     </main>
 </body>
 </html>

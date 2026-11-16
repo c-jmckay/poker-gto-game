@@ -1,3 +1,4 @@
+<div class="seat-position" style="--position: {{ position }}">
 <div class="table-seat {% if is_hero %}hero-seat{% else %}seat heads-up-opponent{% endif %}{% if player.folded %} folded{% endif %}{% if state.acting_seat_id == player.seat_id %} is-acting{% endif %}"
      data-seat="{{ player.seat_id }}">
     {% if is_hero %}
@@ -22,9 +23,10 @@
         {% if player.seat_id == state.dealer_seat_id %}<span class="dealer" aria-label="Dealer">D</span>{% endif %}
         <span class="seat-action"><span aria-hidden="true" class="seat-action-sizer">raise</span><span>{{ badge|default:"" }}</span></span>
     </div>
+</div>
     {% if player.current_bet %}
         <div class="felt-wager" aria-label="{{ player.name }} contributed {{ player.current_bet }} chips this street">
-            <i aria-hidden="true"></i>{{ player.current_bet|floatformat:"0g" }}
+            <i class="chip-icon" aria-hidden="true"></i>{{ player.current_bet|floatformat:"0g" }}
         </div>
     {% endif %}
 </div>

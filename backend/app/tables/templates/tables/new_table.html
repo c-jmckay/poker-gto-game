@@ -1,16 +1,46 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>New poker game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Set up your table · Poker Solver</title>
+    <link rel="stylesheet" href="{% static 'tables/table.css' %}">
+    <link rel="stylesheet" href="{% static 'tables/lobby.css' %}">
+    <script src="{% static 'tables/lobby.js' %}" defer></script>
 </head>
-<body>
-    <h1>Heads-up poker</h1>
-    <p>Play against BasicBot with 1,000 chips each.</p>
-
-    <form method="post" action="{% url 'tables:new' %}">
+<body class="setup-page">
+<header><a class="wordmark" href="{% url 'tables:new' %}">POKER<span>SOLVER</span></a></header>
+<main class="setup-layout">
+    <form class="setup-controls" method="post">
         {% csrf_token %}
-        <button type="submit">New game</button>
+        <h1>Set up your table</h1>
+        <p>No-limit Texas Hold’em</p>
+        <fieldset>
+            <legend>Opponents</legend>
+            <div class="count-picker">
+                {% for n in choices %}
+                <label><input type="radio" name="bot_count" value="{{ n }}" {% if n == 1 %}checked{% endif %}><span>{{ n }}</span></label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+        <dl class="setup-rules">
+            <div><dt>Starting stack</dt><dd>1,000 chips each</dd></div>
+            <div><dt>Blinds</dt><dd>10 / 20</dd></div>
+        </dl>
+        <button class="setup-start" type="submit">Start game</button>
     </form>
+    <figure class="setup-preview">
+        <figcaption><span>Table preview</span><span id="seat-count" aria-live="polite">2 players</span></figcaption>
+        <div class="preview-surface" aria-hidden="true">
+            <div class="preview-felt"></div>
+            {% for n in choices %}
+            <div class="preview-seat" data-bot="{{ n }}" {% if n != 1 %}hidden{% endif %}><i>{{ n }}</i><span>Bot {{ n }}</span></div>
+            {% endfor %}
+            <div class="preview-seat preview-hero"><i>Y</i><span>You</span></div>
+        </div>
+    </figure>
+</main>
 </body>
 </html>
